@@ -1,61 +1,30 @@
-//
-//  ContentView.swift
-//  Ai_Say
-//
-//  Created by Alsay_Mac on 2026/1/13.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
+        VStack(spacing: 18) {
+            Image(systemName: "hand.thumbsdown.fill")
+                .font(.system(size: 64))
+                .symbolRenderingMode(.multicolor)
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
+            Text("不好世界")
+                .font(.largeTitle)
+                .bold()
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
+            Text("Bad, World!")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+
+            Divider().padding(.horizontal)
+
+            Text("本地界面测试（不联网）")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
+        .padding()
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
