@@ -11,23 +11,41 @@ struct TextEvalView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("题目 (Prompt)") {
-                    TextEditor(text: $prompt)
-                        .frame(minHeight: 60)
-                        .focused($isInputFocused)
-                }
+            ScrollView {
+                VStack(spacing: 16) {
 
-                Section("你的回答 (User Text)") {
-                    TextEditor(text: $userText)
-                        .frame(minHeight: 100)
-                        .focused($isInputFocused)
-                    Text("\(userText.count) 字符")
+                    Text("✅ TextEvalView 正在运行")
+                        .font(.headline)
+                        .foregroundStyle(.green)
+
+                    Text(api.serverMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("题目 (Prompt)").font(.headline)
+                        TextEditor(text: $prompt)
+                            .frame(minHeight: 80)
+                            .padding(8)
+                            .background(.secondary.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .focused($isInputFocused)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("你的回答 (User Text)").font(.headline)
+                        TextEditor(text: $userText)
+                            .frame(minHeight: 140)
+                            .padding(8)
+                            .background(.secondary.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .focused($isInputFocused)
+                        Text("\(userText.count) 字符")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Button {
                         isInputFocused = false
                         api.serverMessage = "✅ 按钮已点击"
@@ -37,16 +55,16 @@ struct TextEvalView: View {
                             Text(api.isLoading ? "评分中..." : "提交评估")
                             if api.isLoading { ProgressView() }
                         }
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(api.isLoading || userText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    Text(api.serverMessage) // 注意：这里不要写 $api.serverMessage
-                        .font(.caption)
-                        .foregroundStyle(api.serverMessage.contains("❌") ? .red : .gray)
-                        .frame(maxWidth: .infinity, alignment: .center)
                 }
+                .padding()
+            }
+            .navigationTitle("AI 口语评分")
+        }
+    }
 
                 if let res = api.evalResult {
                     Section("综合评分") {
