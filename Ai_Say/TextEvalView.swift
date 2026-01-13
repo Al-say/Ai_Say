@@ -7,17 +7,21 @@ struct TextEvalView: View {
     @State private var prompt = "Describe your favorite hobby."
     @State private var userText = "My hobby is play basketball. I play it everyday because it make me strong."
 
+    @FocusState private var isInputFocused: Bool
+
     var body: some View {
         NavigationStack {
             List {
                 Section("题目 (Prompt)") {
                     TextEditor(text: $prompt)
                         .frame(minHeight: 60)
+                        .focused($isInputFocused)
                 }
 
                 Section("你的回答 (User Text)") {
                     TextEditor(text: $userText)
                         .frame(minHeight: 100)
+                        .focused($isInputFocused)
                     Text("\(userText.count) 字符")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -25,8 +29,8 @@ struct TextEvalView: View {
 
                 Section {
                     Button {
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                                        to: nil, from: nil, for: nil)
+                        isInputFocused = false
+                        print("✅ Submit tapped")
                         api.evalText(prompt: prompt, userText: userText)
                     } label: {
                         HStack {
