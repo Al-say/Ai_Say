@@ -31,37 +31,36 @@ final class APIManager: ObservableObject {
 
     func evalText(prompt: String, userText: String) {
         let url = "\(baseURL)/api/eval/text"
-        let reqBody = TextEvalReq(
+        DispatchQueue.main.async {
+            self.isLoading = true
+            self.serverMessage = "AI 正在评估..."
+            self.evalResult = nil
+        }
+
+        let body = TextEvalReq(
             prompt: prompt,
             userText: userText,
             expectedKeywords: nil,
             referenceAnswer: nil
         )
 
-        print("REQ URL:", url)
+        AF.request(url,
+                   method: .post,
+                   parameters: body,
+                   encoder: JSONParameterEncoder.default)
+        .validate(statusCode: 200..<300)
+        .responseDecodable(of: TextEvalResp.self) { [weak self] response in
+            DispatchQueue.main.async {
+                self?.isLoading = false
 
-        AF.request(url, method: .post, parameters: reqBody, encoder: JSONParameterEncoder.default)
-            .responseData { resp in
-                let status = resp.response?.statusCode
-                let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
-
-                print("STATUS:", status as Any)
-                print("RAW:", raw)
-                print("ERR:", resp.error as Any)
-
-                DispatchQueue.main.async {
-                    if let status, (200..<300).contains(status) {
-                        do {
-                            let decoded = try JSONDecoder().decode(TextEvalResp.self, from: resp.data ?? Data())
-                            self.evalResult = decoded
-                            self.serverMessage = "✅ 评分完成"
-                        } catch {
-                            self.serverMessage = "❌ 解析失败：\(error.localizedDescription)"
-                        }
-                    } else {
-                        self.serverMessage = "❌ HTTP失败：\(status.map(String.init) ?? "nil")"
-                    }
+                switch response.result {
+                case .success(let data):
+                    self?.evalResult = data
+                    self?.serverMessage = "✅ 评分完成"
+                case .failure(let error):
+                    self?.serverMessage = "❌ 请求失败: \(error.localizedDescription)"
                 }
             }
+        }
     }
 }
