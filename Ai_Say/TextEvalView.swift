@@ -59,65 +59,65 @@ struct TextEvalView: View {
                     }
                     .buttonStyle(.borderedProminent)
 
-                }
-                .padding()
-            }
-            .navigationTitle("AI 口语评分")
-        }
-    }
-
-                if let res = api.evalResult {
-                    Section("综合评分") {
-                        HStack {
-                            ScoreItem(label: "流利度", score: res.fluency)
-                            Spacer()
-                            Divider()
-                            Spacer()
-                            ScoreItem(label: "完整度", score: res.completeness)
-                            Spacer()
-                            Divider()
-                            Spacer()
-                            ScoreItem(label: "相关性", score: res.relevance)
-                        }
-                        .padding(.vertical, 5)
-                    }
-
-                    if let suggestions = res.suggestions, !suggestions.isEmpty {
-                        Section("AI 建议") {
-                            ForEach(suggestions, id: \.self) { sug in
-                                Label(sug, systemImage: "lightbulb.fill")
-                                    .foregroundStyle(.orange)
+                    if let res = api.evalResult {
+                        VStack(spacing: 16) {
+                            VStack(spacing: 8) {
+                                Text("综合评分").font(.headline)
+                                HStack {
+                                    ScoreItem(label: "流利度", score: res.fluency)
+                                    Spacer()
+                                    Divider()
+                                    Spacer()
+                                    ScoreItem(label: "完整度", score: res.completeness)
+                                    Spacer()
+                                    Divider()
+                                    Spacer()
+                                    ScoreItem(label: "相关性", score: res.relevance)
+                                }
+                                .padding(.vertical, 5)
                             }
-                        }
-                    }
 
-                    if let issues = res.issues, !issues.isEmpty {
-                        Section("语法/拼写错误 (\(issues.count))") {
-                            ForEach(issues) { issue in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .foregroundStyle(.red)
-                                        Text(issue.message).bold()
-                                    }
-                                    if let reps = issue.replacements, !reps.isEmpty {
-                                        Text("建议改为: \(reps.joined(separator: " / "))")
-                                            .font(.caption)
-                                            .padding(6)
-                                            .background(Color.green.opacity(0.1))
-                                            .cornerRadius(6)
+                            if let suggestions = res.suggestions, !suggestions.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("AI 建议").font(.headline)
+                                    ForEach(suggestions, id: \.self) { sug in
+                                        Label(sug, systemImage: "lightbulb.fill")
+                                            .foregroundStyle(.orange)
                                     }
                                 }
-                                .padding(.vertical, 2)
+                            }
+
+                            if let issues = res.issues, !issues.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("语法/拼写错误 (\(issues.count))").font(.headline)
+                                    ForEach(issues) { issue in
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            HStack {
+                                                Image(systemName: "exclamationmark.triangle.fill")
+                                                    .foregroundStyle(.red)
+                                                Text(issue.message).bold()
+                                            }
+                                            if let reps = issue.replacements, !reps.isEmpty {
+                                                Text("建议改为: \(reps.joined(separator: " / "))")
+                                                    .font(.caption)
+                                                    .padding(6)
+                                                    .background(Color.green.opacity(0.1))
+                                                    .cornerRadius(6)
+                                            }
+                                        }
+                                        .padding(.vertical, 2)
+                                    }
+                                }
+                            } else {
+                                Text("🎉 太棒了，没有发现明显语法错误！")
+                                    .foregroundStyle(.green)
+                                    .font(.headline)
                             }
                         }
-                    } else {
-                        Section {
-                            Text("🎉 太棒了，没有发现明显语法错误！")
-                                .foregroundStyle(.green)
-                        }
                     }
+
                 }
+                .padding()
             }
             .navigationTitle("AI 口语评分")
         }
