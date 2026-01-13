@@ -5,11 +5,6 @@ struct SingleShotEvalView: View {
 
     @State private var prompt: String = "Describe your favorite hobby in 3-5 sentences."
     @State private var userText: String = ""
-    @State private var isSubmitting: Bool = false
-
-    // 先用本地假数据占位，接后端后用 api.evalResult 替换
-    @State private var scores: (fluency: Double, completeness: Double, relevance: Double)? = nil
-    @State private var suggestions: [String] = []
 
     var body: some View {
         List {
@@ -35,7 +30,7 @@ struct SingleShotEvalView: View {
                     Button {
                         submit()
                     } label: {
-                        if isSubmitting {
+                        if api.isLoading {
                             ProgressView()
                                 .progressViewStyle(.circular)
                         } else {
@@ -43,7 +38,7 @@ struct SingleShotEvalView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!canSubmit || isSubmitting)
+                    .disabled(!canSubmit || api.isLoading)
 
                     Button {
                         reset()
@@ -51,7 +46,7 @@ struct SingleShotEvalView: View {
                         Text("清空")
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isSubmitting)
+                    .disabled(api.isLoading)
                 }
 
                 Text(api.serverMessage)
@@ -59,20 +54,35 @@ struct SingleShotEvalView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let s = scores {
+            if let res = api.evalResult {
                 Section("评分结果") {
-                    ScoreRow(title: "流利度 Fluency", value: s.fluency)
-                    ScoreRow(title: "完整度 Completeness", value: s.completeness)
-                    ScoreRow(title: "相关性 Relevance", value: s.relevance)
+                    ScoreRow(title: "流利度 Fluency", value: res.fluency)
+                    ScoreRow(title: "完整度 Completeness", value: res.completeness)
+                    ScoreRow(title: "相关性 Relevance", value: res.relevance)
                 }
 
                 Section("建议") {
-                    if suggestions.isEmpty {
-                        Text("暂无建议")
-                            .foregroundStyle(.secondary)
-                    } else {
+                    if let suggestions = res.suggestions, !suggestions.isEmpty {
                         ForEach(suggestions, id: \.self) { item in
                             Text("• \(item)")
+                        }
+                    } else {
+                        Text("暂无建议")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if let issues = res.issues, !issues.isEmpty {
+                    Section("语法问题") {
+                        ForEach(issues) { issue in
+                            VStack(alignment: .leading) {
+                                Text(issue.message).bold()
+                                if let reps = issue.replacements, !reps.isEmpty {
+                                    Text("建议: \(reps.joined(separator: ", "))")
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                }
+                            }
                         }
                     }
                 }
@@ -92,26 +102,12 @@ struct SingleShotEvalView: View {
     }
 
     private func submit() {
-        isSubmitting = true
-        api.serverMessage = "评分中..."
-
-        // TODO：把这里替换成你的后端调用（成功后写入 scores/suggestions）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            self.scores = (fluency: 86.0, completeness: 78.0, relevance: 82.0)
-            self.suggestions = [
-                "减少重复词，尝试使用同义替换。",
-                "补充一个具体例子来增强完整度。",
-                "注意句子之间的衔接词（however / therefore）。"
-            ]
-            self.api.serverMessage = "✅ 评分完成"
-            self.isSubmitting = false
-        }
+        api.evalText(prompt: prompt, userText: userText)
     }
 
     private func reset() {
         userText = ""
-        scores = nil
-        suggestions = []
+        api.evalResult = nil
         api.serverMessage = "等待连接..."
     }
 }

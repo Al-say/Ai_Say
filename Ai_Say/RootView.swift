@@ -5,6 +5,7 @@ struct RootView: View {
         NavigationSplitView {
             List {
                 NavigationLink("单次文本评分", destination: SingleShotEvalView())
+                NavigationLink("AI 详细评估 (新)", destination: TextEvalView())
             }
             .navigationTitle("Ai_Say")
         } detail: {
