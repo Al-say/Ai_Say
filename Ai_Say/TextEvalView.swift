@@ -30,6 +30,7 @@ struct TextEvalView: View {
                 Section {
                     Button {
                         isInputFocused = false
+                        api.serverMessage = "✅ 按钮已点击"
                         api.evalText(prompt: prompt, userText: userText)
                     } label: {
                         HStack {
