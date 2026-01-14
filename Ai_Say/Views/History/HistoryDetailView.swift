@@ -7,6 +7,7 @@ struct HistoryDetailView: View {
 
     @State private var parsed: TextEvalResp?
     @State private var shareImage: UIImage?
+    @State private var selectedIssue: Issue? = nil
 
     var body: some View {
         ScrollView {
@@ -59,9 +60,55 @@ struct HistoryDetailView: View {
                 // 用户输入
                 if let userText = item.userText {
                     AppCard(title: "用户输入") {
-                        Text(userText)
-                            .font(.body)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 12) {
+                            if let issues = parsed?.issues, !issues.isEmpty {
+                                IssueHighlightedTextView(
+                                    text: userText,
+                                    issues: issues
+                                ) { issue in
+                                    selectedIssue = issue
+                                }
+                                .padding(16)
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            } else {
+                                Text(userText)
+                                    .font(.body)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            // 显示选中的issue详情
+                            if let issue = selectedIssue {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                        Text("建议修改")
+                                            .font(.subheadline).bold()
+                                        Spacer()
+                                        Button {
+                                            selectedIssue = nil
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 12, weight: .bold))
+                                        }
+                                    }
+                                    .foregroundStyle(.secondary)
+
+                                    Text(issue.message)
+                                        .font(.body)
+
+                                    if let reps = issue.replacements, !reps.isEmpty {
+                                        Text("推荐：\(reps.joined(separator: " / "))")
+                                            .font(.callout)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(16)
+                                .background(Color.accentColor.opacity(0.10))
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
+                        }
                     }
                 }
 
@@ -120,6 +167,7 @@ struct HistoryDetailView: View {
         .onAppear {
             parseResponse()
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: selectedIssue?.id)
     }
 
     private func parseResponse() {
