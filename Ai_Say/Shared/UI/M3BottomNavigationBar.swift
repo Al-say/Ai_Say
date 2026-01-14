@@ -2,32 +2,32 @@ import SwiftUI
 
 struct M3BottomNavigationBar: View {
     @Binding var selection: MainTab
-    private let tabs = MainTab.allCases
 
     var body: some View {
         HStack {
-            ForEach(tabs, id: \.rawValue) { tab in
+            ForEach(MainTab.allCases, id: \.rawValue) { tab in
                 item(tab)
+                    .frame(maxWidth: .infinity)
             }
         }
         .padding(.top, 12)
-        .padding(.bottom, 28)
-        .padding(.horizontal, 12)
+        .padding(.bottom, 18) // iPad 通常不需要 34 的 Home Indicator 预留那么多
+        .padding(.horizontal, 16)
         .background(Color(.secondarySystemBackground))
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
-        .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: -2)
+        .shadow(color: .black.opacity(0.06), radius: 10, y: -2)
     }
 
     private func item(_ tab: MainTab) -> some View {
         let selected = selection == tab
 
-        return VStack(spacing: 4) {
+        return VStack(spacing: 6) {
             ZStack {
                 Capsule()
-                    .fill(selected ? Color.accentColor.opacity(0.18) : .clear)
-                    .frame(width: 66, height: 34)
+                    .fill(selected ? Color.accentColor.opacity(0.18) : Color.clear)
+                    .frame(width: 68, height: 34)
 
-                Image(systemName: selected ? tab.icon + ".fill" : tab.icon)
+                Image(systemName: selected ? "\(tab.icon).fill" : tab.icon)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(selected ? .primary : .secondary)
             }
@@ -37,12 +37,13 @@ struct M3BottomNavigationBar: View {
                 .fontWeight(selected ? .bold : .regular)
                 .foregroundStyle(selected ? .primary : .secondary)
         }
-        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
                 selection = tab
             }
         }
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
