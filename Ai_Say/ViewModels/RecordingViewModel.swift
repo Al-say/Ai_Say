@@ -31,10 +31,16 @@ final class RecordingViewModel: ObservableObject {
     @Published var state: State = .idle
     @Published var prompt: String = "Describe your day."
 
+    // 防重复触发（慢网+连点）
+    @Published private(set) var isInternalProcessing = false
+
+    private var activeRequestId: UUID? = nil
+
     // 暴露给 View 绑定（时长/录音中）
     let recorder: AudioRecorderService
 
     private let client: EvalAPIClient
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Init
 
@@ -44,6 +50,24 @@ final class RecordingViewModel: ObservableObject {
     ) {
         self.recorder = recorder
         self.client = client
+        setupSubscribers()
+    }
+
+    private func setupSubscribers() {
+        recorder.$isRecording
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isRecording in
+                self?.handleRecorderStateChange(isRecording: isRecording)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleRecorderStateChange(isRecording: Bool) {
+        // 如果录音机停止了，但我们的状态还是 .recording，说明是外部原因导致的停止
+        if !isRecording, case .recording = state {
+            stopRecordingFlow()
+        }
     }
 
     // MARK: - UI Actions
@@ -62,9 +86,13 @@ final class RecordingViewModel: ObservableObject {
     }
 
     func submit(context: ModelContext) {
-        guard case let .ready(payload) = state else { return }
+        guard case let .ready(payload) = state, !isInternalProcessing else { return }
 
+        isInternalProcessing = true
         state = .uploading(progress: nil)
+
+        let requestId = UUID()
+        activeRequestId = requestId
 
         client.uploadAudio(
             fileURL: payload.fileURL,
@@ -76,6 +104,9 @@ final class RecordingViewModel: ObservableObject {
             },
             completion: { [weak self] result in
                 guard let self else { return }
+                // ✅ 关键：只处理"最新一次请求"的回调
+                guard self.activeRequestId == requestId else { return }
+
                 switch result {
                 case .success(let output):
                     self.state = .success(
@@ -89,11 +120,14 @@ final class RecordingViewModel: ObservableObject {
                         localFileURL: payload.fileURL,
                         context: context
                     )
+                    self.isInternalProcessing = false
+
                 case .failure(let error):
                     self.state = .failure(
                         message: error.localizedDescription,
                         retry: .init(fileURL: payload.fileURL, prompt: self.prompt)
                     )
+                    self.isInternalProcessing = false
                 }
             }
         )

@@ -4,7 +4,7 @@ import AVKit
 
 struct RecordUploadView: View {
     @StateObject private var api = APIManager.shared
-    @StateObject private var recorder = AudioRecorder()
+    @StateObject private var recorder = AudioRecorderService()
 
     @State private var prompt = "Free Talk"
     @State private var player: AVPlayer?

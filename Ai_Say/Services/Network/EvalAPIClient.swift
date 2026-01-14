@@ -42,6 +42,14 @@ final class EvalAPIClient {
             let rawBody = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
 
             Task { @MainActor in
+                // 记录到DebugStore
+                DebugStore.shared.push(
+                    endpoint: url,
+                    status: statusCode,
+                    raw: rawBody,
+                    error: (200..<300).contains(statusCode) ? nil : "Server Error"
+                )
+
                 print("📡 Status:", statusCode)
                 if (200..<300).contains(statusCode) {
                     do {

@@ -91,4 +91,35 @@ final class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDel
             print("Failed to deactivate audio session: \(error.localizedDescription)")
         }
     }
+
+    // MARK: - AVAudioRecorderDelegate
+    nonisolated func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        Task { @MainActor in
+            self.isRecording = false
+            self.timer?.invalidate()
+            self.timer = nil
+            self.meter.stop()
+            
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            } catch {
+                print("Failed to deactivate audio session on finish: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    nonisolated func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: (any Error)?) {
+        Task { @MainActor in
+            self.isRecording = false
+            self.timer?.invalidate()
+            self.timer = nil
+            self.meter.stop()
+
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            } catch {
+                print("Failed to deactivate audio session on error: \(error.localizedDescription)")
+            }
+        }
+    }
 }

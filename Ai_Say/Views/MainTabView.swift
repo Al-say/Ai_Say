@@ -27,6 +27,7 @@ enum MainTab: Int, CaseIterable {
 
 struct MainTabView: View {
     @StateObject private var router = AppRouter()
+    @State private var showDebug = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -50,5 +51,16 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard)
         .environmentObject(router)
+        .gesture(
+            LongPressGesture(minimumDuration: 0.6)
+                .simultaneously(with: MagnificationGesture(minimumScaleDelta: 0.01))
+                .onEnded { _ in
+                    // "双指长按"的近似实现：长按 + 轻微缩放动作
+                    showDebug = true
+                }
+        )
+        .sheet(isPresented: $showDebug) {
+            DebugOverlayView()
+        }
     }
 }
