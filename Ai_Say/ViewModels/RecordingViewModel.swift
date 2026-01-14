@@ -46,10 +46,12 @@ final class RecordingViewModel: ObservableObject {
 
     init(
         recorder: AudioRecorderService,
-        client: EvalAPIClient
+        client: EvalAPIClient,
+        initialPrompt: String = ""
     ) {
         self.recorder = recorder
         self.client = client
+        self.prompt = initialPrompt
         setupSubscribers()
     }
 
@@ -181,8 +183,14 @@ final class RecordingViewModel: ObservableObject {
 
         // audioPath MVP 约定：
         // - 优先存后端 audioUrl（相对路径），方便历史记录直接回放云端
-        // - 若没有 audioUrl，则存本地 path（至少能本地回放）
-        let audioPath = resp.audioUrl ?? localFileURL.path
+        // - 若没有 audioUrl，则存本地文件名（文件名在沙盒中是不变的，但沙盒路径会变）
+        let audioPath: String?
+        if let remoteUrl = resp.audioUrl {
+            audioPath = remoteUrl
+        } else {
+            // 只存文件名，如 "rec-123456.m4a"
+            audioPath = localFileURL.lastPathComponent
+        }
 
         let item = Item(timestamp: Date(), prompt: prompt, userText: nil)
         item.aiResponse = rawBody

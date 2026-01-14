@@ -5,12 +5,17 @@ import AVKit
 
 struct RecordingView: View {
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var vm = RecordingViewModel(
-        recorder: AudioRecorderService(),
-        client: EvalAPIClient.shared
-    )
+    @StateObject private var vm: RecordingViewModel
 
     @State private var player: AVPlayer?
+
+    init(initialPrompt: String = "") {
+        _vm = StateObject(wrappedValue: RecordingViewModel(
+            recorder: AudioRecorderService(),
+            client: EvalAPIClient.shared,
+            initialPrompt: initialPrompt.isEmpty ? "Describe your day." : initialPrompt
+        ))
+    }
 
     var body: some View {
         GeometryReader { geo in
