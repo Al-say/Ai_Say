@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ExploreView: View {
+    @EnvironmentObject private var router: AppRouter
     @State private var query: String = ""
     @State private var selectedLevel: Scenario.Level? = nil
 
@@ -37,8 +38,9 @@ struct ExploreView: View {
                             let cols = geo.size.width >= 900 ? 3 : 2
                             StaggeredGrid(columns: cols, spacing: 12, data: filtered) { s in
                                 NavigationLink {
-                                    ScenarioDetailView(scenario: s) { _ in
-                                        // 这里未来接：跳转到 RecordingView 并带入 prompt
+                                    ScenarioDetailView(scenario: s) { scenario in
+                                        // 跳转到录音评估页
+                                        router.goToRecording(prompt: scenario.prompts.first ?? scenario.title)
                                     }
                                 } label: {
                                     ScenarioCard(scenario: s)

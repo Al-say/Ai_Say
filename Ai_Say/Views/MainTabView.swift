@@ -26,11 +26,11 @@ enum MainTab: Int, CaseIterable {
 }
 
 struct MainTabView: View {
-    @State private var tab: MainTab = .home
+    @StateObject private var router = AppRouter()
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView(selection: $tab) {
+            TabView(selection: $router.selectedTab) {
                 HomeView()
                     .tag(MainTab.home)
 
@@ -46,8 +46,9 @@ struct MainTabView: View {
             // 隐藏系统 TabBar（让自定义底栏接管）
             .toolbar(.hidden, for: .tabBar)
 
-            M3BottomNavigationBar(selection: $tab)
+            M3BottomNavigationBar(selection: $router.selectedTab)
         }
         .ignoresSafeArea(.keyboard)
+        .environmentObject(router)
     }
 }

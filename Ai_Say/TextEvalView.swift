@@ -4,10 +4,14 @@ import UIKit
 struct TextEvalView: View {
     @StateObject private var api = APIManager.shared
 
-    @State private var prompt = "Describe your favorite hobby."
+    @State private var prompt: String
     @State private var userText = "My hobby is play basketball. I play it everyday because it make me strong."
 
     @FocusState private var isInputFocused: Bool
+
+    init(initialPrompt: String = "Describe your favorite hobby.") {
+        _prompt = State(initialValue: initialPrompt)
+    }
 
     var body: some View {
         NavigationStack {

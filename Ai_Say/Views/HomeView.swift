@@ -1,26 +1,58 @@
 import SwiftUI
 
 struct HomeView: View {
+    @EnvironmentObject private var router: AppRouter
+    @State private var path = NavigationPath()
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // 每日挑战卡片
-                    dailyChallengeCard
-
-                    // 快速开始
-                    quickStartSection
-
-                    // 最近练习
-                    recentPracticeSection
+        NavigationStack(path: $path) {
+            HomeContent()
+                .navigationTitle("Ai_Say")
+                .navigationBarTitleDisplayMode(.large)
+                .onChange(of: router.pendingPrompt) { _, newValue in
+                    guard newValue != nil else { return }
+                    // 自动跳转到录音评估页
+                    path.append("recording")
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 120)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Ai_Say")
-            .navigationBarTitleDisplayMode(.large)
+                .navigationDestination(for: String.self) { route in
+                    if route == "recording" {
+                        RecordingEntryView()
+                    }
+                }
         }
+    }
+}
+
+/// 录音入口页：从 router 取 prompt（一次性消费）
+struct RecordingEntryView: View {
+    @EnvironmentObject private var router: AppRouter
+
+    var body: some View {
+        let prompt = router.consumePrompt() ?? "Free Talk"
+        TextEvalView(initialPrompt: prompt) // 使用现有的TextEvalView
+            .navigationTitle("开始练习")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Home 内容：抽取出来保持代码整洁
+struct HomeContent: View {
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // 每日挑战卡片
+                dailyChallengeCard
+
+                // 快速开始
+                quickStartSection
+
+                // 最近练习
+                recentPracticeSection
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 120)
+        }
+        .background(Color(.systemGroupedBackground))
     }
 
     private var dailyChallengeCard: some View {
