@@ -1,17 +1,24 @@
 import Foundation
 
-// 请求体 (对应 Java: EvalDTO.TextEvalReq)
-struct TextEvalReq: Sendable {
+// ✅ 请求模型：退出 MainActor 隔离，满足 Encodable & Sendable
+nonisolated struct TextEvalReq: Encodable, Sendable {
     let prompt: String
     let userText: String
     let expectedKeywords: [String]?
     let referenceAnswer: String?
 }
 
-nonisolated extension TextEvalReq: Encodable {}
+// ✅ Issue
+nonisolated struct Issue: Decodable, Identifiable, Sendable {
+    var id: String { "\(offset)-\(length)-\(message)" }
+    let offset: Int
+    let length: Int
+    let message: String
+    let replacements: [String]?
+}
 
-// 响应体 (对应 Java: EvalDTO.TextEvalResp)
-struct TextEvalResp: Sendable {
+// ✅ 响应模型：新增 audioUrl
+nonisolated struct TextEvalResp: Decodable, Sendable {
     let recordId: Int64?
 
     let fluency: Double
@@ -20,23 +27,9 @@ struct TextEvalResp: Sendable {
 
     let grammarIssueCount: Int?
     let issues: [Issue]?
-
     let suggestions: [String]?
     let missingKeywords: [String]?
 
+    let audioUrl: String?          // 🆕 后端新增
     let createdAt: String?
 }
-
-nonisolated extension TextEvalResp: Decodable {}
-
-// 问题详情 (对应 Java: EvalDTO.Issue)
-struct Issue: Identifiable, Sendable {
-    var id: String { "\(offset)-\(length)-\(message)" }
-
-    let offset: Int
-    let length: Int
-    let message: String
-    let replacements: [String]?
-}
-
-nonisolated extension Issue: Decodable {}

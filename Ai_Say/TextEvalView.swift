@@ -49,7 +49,13 @@ struct TextEvalView: View {
                     Button {
                         isInputFocused = false
                         api.serverMessage = "✅ 按钮已点击"
-                        api.evalText(prompt: prompt, userText: userText)
+                        Task {
+                            do {
+                                _ = try await api.evalText(prompt: prompt, userText: userText)
+                            } catch {
+                                // Error handled in APIManager
+                            }
+                        }
                     } label: {
                         HStack {
                             Text(api.isLoading ? "评分中..." : "提交评估")

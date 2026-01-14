@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        TextEvalView()
+        NavigationStack { RecordUploadView() }
             .onAppear { print("✅ App appeared") }
     }
 }

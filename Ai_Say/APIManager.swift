@@ -2,65 +2,98 @@ import Foundation
 import Alamofire
 import Combine
 
+@MainActor
 final class APIManager: ObservableObject {
     static let shared = APIManager()
-    private init() {}
 
     private let baseURL = "http://192.168.0.104:8082"
 
     @Published var isLoading = false
-    @Published var serverMessage: String = "等待连接..."
+    @Published var serverMessage: String = "准备就绪"
     @Published var evalResult: TextEvalResp? = nil
 
-    func checkHealth() {
-        let url = "\(baseURL)/api/test"
-        DispatchQueue.main.async { self.serverMessage = "请求中..." }
+    private init() {}
 
-        AF.request(url)
-            .responseString { [weak self] resp in
-                DispatchQueue.main.async {
-                    switch resp.result {
-                    case .success(let value):
-                        self?.serverMessage = "✅ \(value)"
-                    case .failure(let error):
-                        self?.serverMessage = "❌ \(error.localizedDescription)"
+    func uploadAudio(fileURL: URL, prompt: String?) {
+        let url = "\(baseURL)/api/eval/audio"
+
+        isLoading = true
+        serverMessage = "上传中..."
+        evalResult = nil
+
+        AF.upload(
+            multipartFormData: { form in
+                // ✅ 后端字段名：file
+                form.append(fileURL, withName: "file", fileName: "recording.m4a", mimeType: "audio/m4a")
+
+                if let prompt, !prompt.isEmpty {
+                    form.append(Data(prompt.utf8), withName: "prompt")
+                }
+            },
+            to: url,
+            method: .post
+        )
+        .uploadProgress { prog in
+            Task { @MainActor in
+                self.serverMessage = "上传中... \(Int(prog.fractionCompleted * 100))%"
+            }
+        }
+        .responseData { [weak self] resp in
+            guard let self else { return }
+            let status = resp.response?.statusCode
+            let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+            Task { @MainActor in
+                self.isLoading = false
+
+                guard let status else {
+                    self.serverMessage = "❌ 无状态码（ATS/网络问题）"
+                    return
+                }
+
+                if (200..<300).contains(status) {
+                    do {
+                        let decoded = try JSONDecoder().decode(TextEvalResp.self, from: resp.data ?? Data())
+                        self.evalResult = decoded
+                        self.serverMessage = "✅ 上传并评分完成"
+                    } catch {
+                        self.serverMessage = "❌ 解码失败：\(error.localizedDescription) | \(raw.prefix(120))"
                     }
+                } else {
+                    self.serverMessage = "❌ HTTP \(status) | \(raw.prefix(160))"
                 }
             }
+        }
     }
 
-    func evalText(prompt: String, userText: String) {
+    func evalText(prompt: String, userText: String) async throws -> TextEvalResp {
         let url = "\(baseURL)/api/eval/text"
-        DispatchQueue.main.async {
-            self.isLoading = true
-            self.serverMessage = "AI 正在评估..."
-            self.evalResult = nil
+        
+        let req = TextEvalReq(prompt: prompt, userText: userText, expectedKeywords: nil, referenceAnswer: nil)
+        
+        isLoading = true
+        serverMessage = "评估中..."
+        evalResult = nil
+        
+        let response = await AF.request(url, method: .post, parameters: req, encoder: JSONParameterEncoder.default)
+            .serializingDecodable(TextEvalResp.self)
+            .response
+        
+        isLoading = false
+        
+        switch response.result {
+        case .success(let result):
+            evalResult = result
+            serverMessage = "✅ 评估完成"
+            return result
+        case .failure(let error):
+            serverMessage = "❌ 评估失败：\(error.localizedDescription)"
+            throw error
         }
+    }
 
-        let body = TextEvalReq(
-            prompt: prompt,
-            userText: userText,
-            expectedKeywords: nil,
-            referenceAnswer: nil
-        )
-
-        AF.request(url,
-                   method: .post,
-                   parameters: body,
-                   encoder: JSONParameterEncoder.default)
-        .validate(statusCode: 200..<300)
-        .responseDecodable(of: TextEvalResp.self) { [weak self] response in
-            DispatchQueue.main.async {
-                self?.isLoading = false
-
-                switch response.result {
-                case .success(let data):
-                    self?.evalResult = data
-                    self?.serverMessage = "✅ 评分完成"
-                case .failure(let error):
-                    self?.serverMessage = "❌ 请求失败: \(error.localizedDescription)"
-                }
-            }
-        }
+    // 供播放拼接完整 URL
+    func fullAudioURL(from path: String) -> URL? {
+        URL(string: "\(baseURL)\(path)")
     }
 }

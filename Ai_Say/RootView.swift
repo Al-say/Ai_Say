@@ -6,6 +6,7 @@ struct RootView: View {
             List {
                 NavigationLink("单次文本评分", destination: SingleShotEvalView())
                 NavigationLink("AI 详细评估 (新)", destination: TextEvalView())
+                NavigationLink("口语录音评分", destination: RecordingView())
             }
             .navigationTitle("Ai_Say")
         } detail: {

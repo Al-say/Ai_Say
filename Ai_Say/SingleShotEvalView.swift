@@ -102,7 +102,13 @@ struct SingleShotEvalView: View {
     }
 
     private func submit() {
-        api.evalText(prompt: prompt, userText: userText)
+        Task {
+            do {
+                _ = try await api.evalText(prompt: prompt, userText: userText)
+            } catch {
+                // Error is handled in APIManager by setting serverMessage
+            }
+        }
     }
 
     private func reset() {
