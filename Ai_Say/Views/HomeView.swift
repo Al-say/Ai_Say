@@ -1,103 +1,202 @@
 import SwiftUI
+import SwiftData
 
 struct HomeView: View {
-    @EnvironmentObject private var router: AppRouter
-    @State private var path = NavigationPath()
+    @EnvironmentObject var router: AppRouter
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
+
+    // 模拟今日挑战数据
+    private var dailyPrompt = "Describe your favorite childhood memory."
 
     var body: some View {
-        NavigationStack(path: $path) {
-            HomeContent()
-                .navigationTitle("Ai_Say")
-                .navigationBarTitleDisplayMode(.large)
-                .onChange(of: router.pendingPrompt) { _, newValue in
-                    guard newValue != nil else { return }
-                    // 自动跳转到录音评估页
-                    path.append("recording")
-                }
-                .navigationDestination(for: String.self) { route in
-                    if route == "recording" {
-                        RecordingEntryView()
+        NavigationStack {
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    // 使用 ViewThatFits 处理 iPad 横竖屏自适应
+                    ViewThatFits(in: .horizontal) {
+                        // 1. 横屏：双栏布局
+                        HStack(alignment: .top, spacing: 24) {
+                            leftTaskColumn.frame(maxWidth: .infinity)
+                            rightInfoColumn.frame(width: 360)
+                        }
+                        .padding(24)
+
+                        // 2. 竖屏/窄屏：单栏堆叠
+                        VStack(spacing: 24) {
+                            leftTaskColumn
+                            rightInfoColumn
+                        }
+                        .padding(20)
                     }
+                    .padding(.bottom, 120) // 给底栏和 FAB 留空间
                 }
-        }
-    }
-}
+                .background(Color(.systemBackground))
+                .navigationTitle("EchoLingua")
 
-/// 录音入口页：从 router 取 prompt（一次性消费）
-struct RecordingEntryView: View {
-    @EnvironmentObject private var router: AppRouter
-
-    var body: some View {
-        let prompt = router.consumePrompt() ?? "Free Talk"
-        TextEvalView(initialPrompt: prompt) // 使用现有的TextEvalView
-            .navigationTitle("开始练习")
-            .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-/// Home 内容：抽取出来保持代码整洁
-struct HomeContent: View {
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // 每日挑战卡片
-                dailyChallengeCard
-
-                // 快速开始
-                quickStartSection
-
-                // 最近练习
-                recentPracticeSection
+                // 3. Primary CTA: Extended FAB (悬浮行动按钮)
+                primaryFAB
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 120)
+            // 监听路由跳转
+            .sheet(item: Binding(
+                get: { router.pendingPrompt.map { IdentifiableString(val: $0) } },
+                set: { _ in _ = router.consumePrompt() }
+            )) { promptObj in
+                RecordingView(initialPrompt: promptObj.val)
+            }
         }
-        .background(Color(.systemGroupedBackground))
     }
 
-    private var dailyChallengeCard: some View {
-        AppCard {
+    // MARK: - 左侧：任务流 (Task Column)
+    private var leftTaskColumn: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // 今日挑战卡片
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("今日挑战")
-                            .font(.headline)
-                        Text("完成 3 次练习，提升流利度")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    Label("今日挑战", systemImage: "sparkles")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(Color.accentColor)
                     Spacer()
-                    Image(systemName: "flame.fill")
-                        .font(.title)
-                        .foregroundStyle(.orange)
+                    Button("更换题目") { /* 弹出题目选择 Sheet */ }
+                        .font(.caption.bold())
                 }
 
-                ProgressView(value: 0.67)
-                    .tint(.orange)
+                Text(dailyPrompt)
+                    .font(.title3.bold())
+                    .lineLimit(3)
 
-                Text("2 / 3 已完成")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Label("中级", systemImage: "gauge.medium")
+                    Label("建议 2min", systemImage: "clock")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding(24)
+            .background(Color.accentColor.opacity(0.12)) // M3 Tonal 高亮
+            .clipShape(RoundedRectangle(cornerRadius: 28))
+
+            // 场景入口 2x2 Grid
+            Text("快速练习").font(.headline).padding(.leading, 8)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                QuickEntryCard(title: "职场面试", icon: "briefcase.fill", color: .blue)
+                QuickEntryCard(title: "旅行社交", icon: "airplane", color: .orange)
+                QuickEntryCard(title: "自由表达", icon: "quote.bubble.fill", color: .purple)
+                QuickEntryCard(title: "收藏题目", icon: "star.fill", color: .yellow)
             }
         }
     }
 
-    private var quickStartSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("快速开始")
-                .font(.title3)
-                .fontWeight(.semibold)
+    // MARK: - 右侧：复盘流 (Info Column)
+    private var rightInfoColumn: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // 最近一次结果快照
+            if let lastItem = items.first {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("最近表现").font(.headline)
 
+                    HStack(spacing: 15) {
+                        ScoreMiniCircle(score: scoreInt(lastItem), label: "总分")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("上次练习：\(lastItem.timestamp.formatted(.dateTime.month().day().hour().minute()))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("进步显著，继续保持！")
+                                .font(.caption.bold())
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                }
+            } else {
+                // 空态显示
+                EmptyStateCard(text: "完成第一次练习后\n解锁成长报告")
+            }
+
+            // 历史列表预览
+            Text("练习记录").font(.headline)
+            historyPreviewList
+                .padding(16)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+        }
+    }
+
+    // MARK: - Primary CTA (FAB)
+    private var primaryFAB: some View {
+        Button {
+            router.goToRecording(prompt: dailyPrompt)
+        } label: {
             HStack(spacing: 12) {
-                quickStartButton("话术练习", "text.bubble", .blue)
-                quickStartButton("发音练习", "waveform", .green)
-                quickStartButton("对话练习", "bubble.left.and.bubble.right", .purple)
+                Image(systemName: "mic.fill")
+                    .font(.title2)
+                Text("开始练习")
+                    .fontWeight(.bold)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+            .background(Color.accentColor)
+            .foregroundStyle(.white)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
         }
+        .padding(32)
     }
 
-    private func quickStartButton(_ title: String, _ icon: String, _ color: Color) -> some View {
-        VStack(spacing: 8) {
+    // MARK: - 辅助函数
+    private func scoreInt(_ item: Item) -> Int {
+        // 兼容 Double? / nil
+        let v = item.score ?? 0
+        // 兼容异常值
+        let clamped = min(max(v, 0), 100)
+        return Int(clamped.rounded())
+    }
+
+    private var displayItems: [Item] {
+        Array(items.prefix(3))
+    }
+
+    // 最近记录列表（修复尾部分割线）
+    private var historyPreviewList: some View {
+        VStack(spacing: 0) {
+            let list = displayItems
+            ForEach(Array(list.enumerated()), id: \.element.id) { idx, item in
+                HStack {
+                    Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                    Text(item.timestamp, format: .dateTime.month().day())
+                        .font(.caption.monospacedDigit())
+                    Text(item.isAudio ? "口语评估" : "文本评估")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(scoreInt(item))")
+                        .font(.subheadline.bold())
+                        .monospacedDigit()
+                }
+                .padding(.vertical, 12)
+
+                if idx != list.count - 1 {
+                    Divider()
+                }
+            }
+            Button("查看全部历史") {
+                router.selectedTab = .growth // 跳转到成长/历史
+            }
+            .font(.caption.bold())
+            .padding(.top, 10)
+        }
+    }
+}
+
+// MARK: - 辅助组件
+
+struct QuickEntryCard: View {
+    let title: String; let icon: String; let color: Color
+    @EnvironmentObject var router: AppRouter
+
+    var body: some View {
+        VStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(color.opacity(0.1))
@@ -113,49 +212,59 @@ struct HomeContent: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .onTapGesture {
+            // 暂时打日志，后续可以跳转到对应场景
+            print("Tapped: \(title)")
+            // 示例：跳转到explore tab选择题目
+            router.selectedTab = .explore
+        }
     }
+}
 
-    private var recentPracticeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("最近练习")
-                .font(.title3)
-                .fontWeight(.semibold)
+struct ScoreMiniCircle: View {
+    let score: Int; let label: String
+
+    var body: some View {
+        let progress = min(max(Double(score) / 100.0, 0), 1)
+
+        ZStack {
+            Circle()
+                .stroke(Color.accentColor.opacity(0.12), lineWidth: 4)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
 
             VStack(spacing: 0) {
-                recentPracticeRow("商务英语对话", "2 天前", 85)
-                Divider().padding(.leading, 60)
-                recentPracticeRow("演讲技巧", "5 天前", 78)
-                Divider().padding(.leading, 60)
-                recentPracticeRow("日常对话", "1 周前", 92)
-            }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-    }
-
-    private func recentPracticeRow(_ title: String, _ time: String, _ score: Int) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(time)
-                    .font(.caption)
+                Text("\(score)")
+                    .font(.system(.subheadline, design: .monospaced)).bold()
+                Text(label)
+                    .font(.system(size: 8))
                     .foregroundStyle(.secondary)
             }
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                Text("\(score)")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Image(systemName: "star.fill")
-                    .font(.caption)
-                    .foregroundStyle(.yellow)
-            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .frame(width: 50, height: 50)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
     }
+}
+
+struct EmptyStateCard: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.caption).multilineTextAlignment(.center)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, minHeight: 120)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
+                    .foregroundStyle(.tertiary)
+            )
+    }
+}
+
+// 辅助包装类
+struct IdentifiableString: Identifiable {
+    let id = UUID()
+    let val: String
 }
