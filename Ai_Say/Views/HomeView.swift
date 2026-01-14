@@ -57,6 +57,12 @@ struct HomeView: View {
                         .presentationDetents([.medium, .large]) // M3 风格半屏
                 }
             }
+            .onChange(of: router.sheetRoute) { newValue in
+                // 当 sheet 被系统关闭时（newValue == nil），做一次清理
+                if newValue == nil {
+                    router.dismissSheet()
+                }
+            }
         }
     }
 

@@ -21,4 +21,8 @@ final class AppRouter: ObservableObject {
     func goToRecording(prompt: String) {
         self.sheetRoute = .recording(prompt: prompt)
     }
+
+    func dismissSheet() {
+        self.sheetRoute = nil
+    }
 }
