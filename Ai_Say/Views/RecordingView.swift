@@ -79,6 +79,12 @@ struct RecordingView: View {
                         }
                     }
 
+                    // 录音波形（录音中才显示）
+                    if vm.recorder.isRecording {
+                        WaveformView(samples: vm.recorder.meter.samples)
+                            .transition(.opacity)
+                    }
+
                     HStack {
                         Text("时长：\(formatDuration(vm.recorder.duration))")
                             .font(.callout)
@@ -310,21 +316,6 @@ struct RecordingView: View {
 }
 
 // MARK: - Small UI Pieces
-
-private struct AppCard<Content: View>: View {
-    let title: String
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
-            content
-        }
-        .padding(16)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
 
 private struct ScorePill: View {
     let title: String

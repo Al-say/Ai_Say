@@ -3,7 +3,7 @@ import AVFoundation
 import Combine
 
 @MainActor
-final class AudioRecorder: NSObject, ObservableObject {
+final class AudioRecorder: NSObject, ObservableObject, AVAudioRecorderDelegate {
     @Published var isRecording = false
     @Published var lastFileURL: URL?
 
@@ -33,6 +33,7 @@ final class AudioRecorder: NSObject, ObservableObject {
         ]
 
         recorder = try AVAudioRecorder(url: url, settings: settings)
+        recorder?.delegate = self
         recorder?.prepareToRecord()
         recorder?.record()
 
@@ -44,5 +45,12 @@ final class AudioRecorder: NSObject, ObservableObject {
         recorder?.stop()
         recorder = nil
         isRecording = false
+
+        // Deactivate audio session to release the microphone
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("Failed to deactivate audio session: \(error.localizedDescription)")
+        }
     }
 }

@@ -4,10 +4,12 @@ import AVFoundation
 import Combine
 
 @MainActor
-final class AudioRecorderService: ObservableObject {
+final class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDelegate {
     @Published var isRecording: Bool = false
     @Published var duration: TimeInterval = 0
     @Published var lastFileURL: URL?
+
+    let meter = AudioLevelMeter()   // ✅ 新增
 
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
@@ -51,12 +53,17 @@ final class AudioRecorderService: ObservableObject {
         ]
 
         recorder = try AVAudioRecorder(url: url, settings: settings)
+        recorder?.delegate = self
+        recorder?.isMeteringEnabled = true // ✅ 必须
         recorder?.prepareToRecord()
         recorder?.record()
 
         isRecording = true
         duration = 0
         lastFileURL = url
+
+        // ✅ 启动采样
+        if let r = recorder { meter.start(recorder: r) }
 
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -70,9 +77,18 @@ final class AudioRecorderService: ObservableObject {
         recorder?.stop()
         recorder = nil
 
+        meter.stop() // ✅ 必须
+
         timer?.invalidate()
         timer = nil
 
         isRecording = false
+
+        // Deactivate audio session to release the microphone
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("Failed to deactivate audio session: \(error.localizedDescription)")
+        }
     }
 }

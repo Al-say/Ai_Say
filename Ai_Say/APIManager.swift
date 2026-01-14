@@ -6,7 +6,7 @@ import Combine
 final class APIManager: ObservableObject {
     static let shared = APIManager()
 
-    private let baseURL = "http://192.168.0.104:8082"
+    private let baseURL = AppConfig.baseURL
 
     @Published var isLoading = false
     @Published var serverMessage: String = "准备就绪"

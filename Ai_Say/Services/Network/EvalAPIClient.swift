@@ -5,7 +5,7 @@ import Alamofire
 final class EvalAPIClient {
     static let shared = EvalAPIClient()
 
-    private let baseURL = "http://192.168.0.104:8082"
+    private let baseURL = AppConfig.baseURL
     private init() {}
 
     struct UploadOutput {
