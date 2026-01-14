@@ -1,48 +1,37 @@
 import Foundation
 import AVFoundation
-import SwiftUI
-import Combine
 
 @MainActor
 final class AudioLevelMeter: ObservableObject {
-    @Published var level: CGFloat = 0           // 0...1
-    @Published var samples: [CGFloat] = Array(repeating: 0.05, count: 32)
+    @Published private(set) var level: Double = 0 // 0...1
 
-    private var timer: Timer?
     private weak var recorder: AVAudioRecorder?
+    private var timer: Timer?
 
-    func start(recorder: AVAudioRecorder) {
+    func bind(recorder: AVAudioRecorder?) {
         self.recorder = recorder
+        self.recorder?.isMeteringEnabled = true
+    }
+
+    func start() {
         stop()
 
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, let r = self.recorder, r.isRecording else { return }
-                r.updateMeters()
+            guard let self else { return }
+            guard let r = self.recorder else { return }
 
-                // averagePower: -160...0
-                let avg = r.averagePower(forChannel: 0)
-                let normalized = self.normalizePower(avg) // 0...1
+            r.updateMeters()
+            let peak = r.peakPower(forChannel: 0) // -160...0
 
-                self.level = normalized
-                self.pushSample(normalized)
-            }
+            // 映射到 0...1，并做轻微下限避免完全静止
+            let normalized = max(0.02, min(1.0, pow(10.0, Double(peak) / 20.0)))
+            self.level = normalized
         }
     }
 
     func stop() {
         timer?.invalidate()
         timer = nil
-    }
-
-    private func pushSample(_ v: CGFloat) {
-        samples.removeFirst()
-        samples.append(max(0.02, v))
-    }
-
-    private func normalizePower(_ power: Float) -> CGFloat {
-        // 把 [-60, 0] 映射到 [0,1]，低于 -60 认为 0
-        let p = max(-60, min(0, power))
-        return CGFloat((p + 60) / 60)
+        level = 0
     }
 }

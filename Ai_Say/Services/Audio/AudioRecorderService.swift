@@ -62,8 +62,9 @@ final class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDel
         duration = 0
         lastFileURL = url
 
-        // ✅ 启动采样
-        if let r = recorder { meter.start(recorder: r) }
+        // ✅ 绑定并启动采样
+        meter.bind(recorder: recorder)
+        meter.start()
 
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in

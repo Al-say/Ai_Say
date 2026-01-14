@@ -6,7 +6,8 @@ enum ResultShareService {
     static func renderReport(
         title: String,
         resp: TextEvalResp,
-        dimensions: [RadarDimension]
+        dimensions: [RadarDimension],
+        scale: CGFloat = 2.0
     ) -> UIImage? {
         let view = ReportCardView(
             title: title,
@@ -16,7 +17,7 @@ enum ResultShareService {
         )
 
         let renderer = ImageRenderer(content: view)
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = scale
         renderer.isOpaque = true // 导出更干净
 
         return renderer.uiImage
