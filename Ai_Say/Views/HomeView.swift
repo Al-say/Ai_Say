@@ -6,8 +6,18 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
 
-    // 模拟今日挑战数据
-    private var dailyPrompt = "Describe your favorite childhood memory."
+    @State private var dailyPrompt: String = "Describe your favorite childhood memory."
+
+    // 💡 提取最近 5 条不重复的历史 Prompt
+    private var historyPrompts: [String] {
+        let allPrompts = items.compactMap { $0.prompt }
+        var unique: [String] = []
+        for p in allPrompts where !unique.contains(p) {
+            unique.append(p)
+            if unique.count >= 5 { break }
+        }
+        return unique
+    }
 
     var body: some View {
         NavigationStack {
@@ -37,12 +47,15 @@ struct HomeView: View {
                 // 3. Primary CTA: Extended FAB (悬浮行动按钮)
                 primaryFAB
             }
-            // 监听路由跳转
-            .sheet(item: Binding(
-                get: { router.pendingPrompt.map { IdentifiableString(val: $0) } },
-                set: { _ in _ = router.consumePrompt() }
-            )) { promptObj in
-                RecordingView(initialPrompt: promptObj.val)
+            // ✅ 统一 Sheet 路由入口
+            .sheet(item: $router.sheetRoute) { route in
+                switch route {
+                case .recording(let prompt):
+                    RecordingView(initialPrompt: prompt)
+                case .changePrompt:
+                    PromptPickerSheet(currentPrompt: $dailyPrompt, historyPrompts: historyPrompts)
+                        .presentationDetents([.medium, .large]) // M3 风格半屏
+                }
             }
         }
     }
@@ -57,7 +70,9 @@ struct HomeView: View {
                         .font(.subheadline.bold())
                         .foregroundStyle(Color.accentColor)
                     Spacer()
-                    Button("更换题目") { /* 弹出题目选择 Sheet */ }
+                    Button("更换题目") {
+                        router.sheetRoute = .changePrompt // ✅ 触发更稳健的路由
+                    }
                         .font(.caption.bold())
                 }
 
@@ -261,10 +276,4 @@ struct EmptyStateCard: View {
                     .foregroundStyle(.tertiary)
             )
     }
-}
-
-// 辅助包装类
-struct IdentifiableString: Identifiable {
-    let id = UUID()
-    let val: String
 }

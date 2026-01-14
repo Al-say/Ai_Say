@@ -4,17 +4,21 @@ import Combine
 @MainActor
 final class AppRouter: ObservableObject {
     @Published var selectedTab: MainTab = .home
+    @Published var sheetRoute: SheetRoute?
 
-    // 用于跨 Tab 传参（例如 Explore 选中的 prompt）
-    @Published var pendingPrompt: String? = nil
+    enum SheetRoute: Identifiable, Equatable {
+        case recording(prompt: String)
+        case changePrompt // 新增：更换题目路由
 
-    func goToRecording(prompt: String) {
-        pendingPrompt = prompt
-        selectedTab = .home   // 或者 .home 内部再 push 到 Recording
+        var id: String {
+            switch self {
+            case .recording(let prompt): return "rec_\(prompt)"
+            case .changePrompt: return "change_prompt"
+            }
+        }
     }
 
-    func consumePrompt() -> String? {
-        defer { pendingPrompt = nil }
-        return pendingPrompt
+    func goToRecording(prompt: String) {
+        self.sheetRoute = .recording(prompt: prompt)
     }
 }
