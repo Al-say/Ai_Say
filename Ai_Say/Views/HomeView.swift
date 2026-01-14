@@ -52,9 +52,10 @@ struct HomeView: View {
                 switch route {
                 case .recording(let prompt):
                     RecordingView(initialPrompt: prompt)
+
                 case .changePrompt:
                     PromptPickerSheet(currentPrompt: $dailyPrompt, historyPrompts: historyPrompts)
-                        .presentationDetents([.medium, .large]) // M3 风格半屏
+                        .presentationDetents([.medium, .large])
                 }
             }
             .onChange(of: router.sheetRoute) { newValue in
@@ -77,7 +78,7 @@ struct HomeView: View {
                         .foregroundStyle(Color.accentColor)
                     Spacer()
                     Button("更换题目") {
-                        router.sheetRoute = .changePrompt // ✅ 触发更稳健的路由
+                        router.showPromptPicker() // ✅ 触发更稳健的路由
                     }
                         .font(.caption.bold())
                 }

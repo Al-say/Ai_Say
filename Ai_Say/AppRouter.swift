@@ -8,21 +8,25 @@ final class AppRouter: ObservableObject {
 
     enum SheetRoute: Identifiable, Equatable {
         case recording(prompt: String)
-        case changePrompt // 新增：更换题目路由
+        case changePrompt
 
-        var id: String {
+        var id: String {                     // ✅ 必须提供 id
             switch self {
-            case .recording(let prompt): return "rec_\(prompt)"
-            case .changePrompt: return "change_prompt"
+            case .recording(let prompt): return "recording:\(prompt)"
+            case .changePrompt: return "changePrompt"
             }
         }
     }
 
     func goToRecording(prompt: String) {
-        self.sheetRoute = .recording(prompt: prompt)
+        sheetRoute = .recording(prompt: prompt)
+    }
+
+    func showPromptPicker() {
+        sheetRoute = .changePrompt
     }
 
     func dismissSheet() {
-        self.sheetRoute = nil
+        sheetRoute = nil
     }
 }
