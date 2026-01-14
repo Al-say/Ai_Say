@@ -1,0 +1,273 @@
+openapi: 3.0.0
+info:
+  title: EchoLingua 核心 API 接口契约（前端版 v1.0）
+  version: "1.0.0"
+  description: |
+    EchoLingua 口语评估应用的核心API接口契约。
+    前端已按UTF-16 offset/length实现错词高亮，并通过DebugOverlay记录每次API的status/raw/error；
+    音频上传字段强约束为`file`，回放通过`BaseURL + audioUrl`拼接播放。
+
+servers:
+  - url: http://192.168.0.104:8082
+    description: 真机/iPad 联调环境
+  - url: http://localhost:8082
+    description: iOS 模拟器环境
+
+paths:
+  /api/eval/audio:
+    post:
+      summary: 音频上传与口语评估
+      description: |
+        上传录音文件并进行口语评估。
+        音频URL若为相对路径（如`/uploads/...`），前端拼接`BaseURL + audioUrl`；
+        若后端返回完整URL（以`http`开头），前端直接使用该URL。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 录音文件（二进制，m4a格式）
+                prompt:
+                  type: string
+                  description: 题目/场景文本（可选）
+              required:
+                - file
+      responses:
+        '200':
+          description: 评估成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioEvalResponse'
+        '400':
+          description: 请求错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: 文件过大
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/eval/text:
+    post:
+      summary: 文本评估接口（可选/补充）
+      description: 文本评估接口，用于补充评估。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextEvalRequest'
+      responses:
+        '200':
+          description: 评估成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextEvalResponse'
+        '400':
+          description: 请求错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /uploads/{date}/{filename}.m4a:
+    get:
+      summary: 静态资源回放（音频GET）
+      description: |
+        获取上传的音频文件。
+        Content-Type推荐：audio/mp4 或 audio/x-m4a；
+        允许：application/octet-stream（前端仍可播放）。
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+          description: 日期路径
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 文件名（不含扩展名）
+      responses:
+        '200':
+          description: 音频文件
+          content:
+            audio/mp4:
+              schema:
+                type: string
+                format: binary
+            audio/x-m4a:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: 文件未找到
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AudioEvalResponse:
+      type: object
+      properties:
+        recordId:
+          type: integer
+          description: 记录ID
+        fluency:
+          type: number
+          format: float
+          description: 流畅度分数
+        completeness:
+          type: number
+          format: float
+          description: 完整性分数
+        relevance:
+          type: number
+          format: float
+          description: 相关性分数
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: 问题列表
+        suggestions:
+          type: array
+          items:
+            type: string
+          description: 建议列表
+        audioUrl:
+          type: string
+          description: 音频URL（相对或绝对）
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+      required:
+        - recordId
+        - fluency
+        - completeness
+        - relevance
+        - issues
+        - suggestions
+        - audioUrl
+        - createdAt
+
+    Issue:
+      type: object
+      properties:
+        offset:
+          type: integer
+          description: 偏移量（UTF-16 code unit）
+        length:
+          type: integer
+          description: 长度（UTF-16 code unit）
+        message:
+          type: string
+          description: 问题消息
+        replacements:
+          type: array
+          items:
+            type: string
+          description: 建议替换词
+      required:
+        - offset
+        - length
+        - message
+
+    TextEvalRequest:
+      type: object
+      properties:
+        prompt:
+          type: string
+          description: 提示文本
+        userText:
+          type: string
+          description: 用户文本
+        expectedKeywords:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 期望关键词（可选）
+        referenceAnswer:
+          type: string
+          nullable: true
+          description: 参考答案（可选）
+      required:
+        - prompt
+        - userText
+
+    TextEvalResponse:
+      type: object
+      properties:
+        fluency:
+          type: number
+          format: float
+        completeness:
+          type: number
+          format: float
+        relevance:
+          type: number
+          format: float
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+        suggestions:
+          type: array
+          items:
+            type: string
+      required:
+        - fluency
+        - completeness
+        - relevance
+        - issues
+        - suggestions
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 错误代码
+        message:
+          type: string
+          description: 错误消息
+        detail:
+          type: string
+          description: 详细错误信息
+      required:
+        - code
+        - message
