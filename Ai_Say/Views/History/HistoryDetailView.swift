@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AVKit
 import UIKit
 
 struct HistoryDetailView: View {
@@ -8,6 +9,7 @@ struct HistoryDetailView: View {
     @State private var parsed: TextEvalResp?
     @State private var shareImage: UIImage?
     @State private var selectedIssue: Issue? = nil
+    @State private var player: AVPlayer?
 
     var body: some View {
         ScrollView {
@@ -121,13 +123,30 @@ struct HistoryDetailView: View {
                     }
                 }
 
-                // 音频文件路径（如果有）
+                // 音频文件路径与播放
                 if let audioPath = item.audioPath {
-                    AppCard(title: "音频文件") {
-                        Text(audioPath)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    AppCard(title: "音频回顾") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if let url = resolveAudioURL(audioPath) {
+                                Button {
+                                    playAudio(url)
+                                } label: {
+                                    Label("播放录音", systemImage: "play.circle.fill")
+                                        .font(.headline)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                }
+                                .buttonStyle(.borderedProminent)
+                            } else {
+                                Text("⚠️ 找不到音频文件")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+
+                            Text(audioPath)
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
                 }
 
@@ -178,6 +197,33 @@ struct HistoryDetailView: View {
         } catch {
             print("解析响应失败: \(error)")
         }
+    }
+
+    private func resolveAudioURL(_ path: String) -> URL? {
+        if path.hasPrefix("http") || path.hasPrefix("/uploads/") {
+            // 云端路径
+            return EvalAPIClient.shared.fullURL(path: path)
+        } else {
+            // 本地路径（可能是新存的文件名，也可能是旧存的绝对路径）
+            let filename = (path as NSString).lastPathComponent
+            let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let localURL = docDir.appendingPathComponent(filename)
+            
+            if FileManager.default.fileExists(atPath: localURL.path) {
+                return localURL
+            }
+            // 兜底：如果是旧的且文件还在原来的绝对路径（虽然很少见）
+            if FileManager.default.fileExists(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
+            return nil
+        }
+    }
+
+    private func playAudio(_ url: URL) {
+        let playerItem = AVPlayerItem(url: url)
+        player = AVPlayer(playerItem: playerItem)
+        player?.play()
     }
 }
 

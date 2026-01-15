@@ -105,7 +105,7 @@ struct RecordingView: View {
             AppCard(title: "提交") {
                 VStack(spacing: 12) {
                     Button {
-                        vm.submit(context: modelContext)
+                        vm.uploadAndSave(context: modelContext)
                     } label: {
                         HStack(spacing: 8) {
                             Text(submitTitle)
@@ -116,15 +116,15 @@ struct RecordingView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(submitDisabled)
 
-                    if case let .uploading(progress) = vm.state, let p = progress {
-                        ProgressView(value: p)
-                        Text("上传进度：\(Int(p * 100))%")
+                    if case .uploading = vm.state {
+                        ProgressView()
+                        Text("正在上传...")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    if case let .failure(message, _) = vm.state {
+                    if case let .failure(message) = vm.state {
                         Text(message)
                             .font(.caption)
                             .foregroundStyle(.red)

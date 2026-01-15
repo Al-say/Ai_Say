@@ -10,7 +10,7 @@ nonisolated struct TextEvalReq: Encodable, Sendable {
 
 // ✅ Issue
 nonisolated struct Issue: Decodable, Identifiable, Sendable {
-    var id: String { "\(offset)-\(length)-\(message)" }
+    var id: String { "\(offset)-\(length)-\(message.hashValue)" }
     let offset: Int
     let length: Int
     let message: String
