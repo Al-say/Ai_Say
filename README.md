@@ -6,12 +6,17 @@
 
 所有前端请求统一使用 **8082端口**：
 
-- **模拟器调试**：自动使用 `http://localhost:8082`
-- **真机调试**：需配置电脑局域网IP，通过UserDefaults设置：
+- **模拟器调试**：设置 `UserDefaults` 的 `api_host` 为 `"localhost"`
   ```swift
-  UserDefaults.standard.set("192.168.0.104", forKey: "api_host")
+  UserDefaults.standard.set("localhost", forKey: "api_host")
+  ```
+- **真机调试**：设置 `UserDefaults` 的 `api_host` 为电脑局域网IP
+  ```swift
+  UserDefaults.standard.set("192.168.0.104", forKey: "api_host")  // 替换为你的电脑IP
   ```
   确保iPad/iPhone与电脑在同一Wi-Fi网络下。
+
+**重要**：真机不能使用 `localhost`，必须使用后端机器的实际局域网IP！
 
 ### 支持的API端点
 
