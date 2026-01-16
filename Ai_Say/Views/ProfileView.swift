@@ -130,6 +130,8 @@ struct ProfileView: View {
 
             AppCard {
                 VStack(spacing: 0) {
+                    PersonaPickerRow()
+                    Divider().padding(.leading, 44)
                     M3SettingRow(icon: "target", title: "练习目标", detail: "每日 20 分钟")
                     Divider().padding(.leading, 44)
                     M3SettingRow(icon: "waveform", title: "发音参考", detail: "美式英语")
@@ -196,5 +198,27 @@ struct M3SettingRow: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .contentShape(Rectangle())
+    }
+}
+
+struct PersonaPickerRow: View {
+    @StateObject private var store = PersonaStore.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("当前模式").font(.subheadline).foregroundStyle(.secondary)
+
+            Picker("", selection: Binding(
+                get: { store.current },
+                set: { store.setPersona($0) }
+            )) {
+                ForEach(UserPersona.allCases, id: \.self) { p in
+                    Text(p.title).tag(p)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 }

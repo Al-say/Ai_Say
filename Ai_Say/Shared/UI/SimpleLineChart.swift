@@ -1,36 +1,48 @@
 import SwiftUI
 
 struct SimpleLineChart: View {
-    let values: [Double]
+    let points: [TrendPoint]
 
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let maxV = (values.max() ?? 1)
-            let minV = (values.min() ?? 0)
-            let span = max(1e-6, maxV - minV)
-            let stepX = w / CGFloat(max(values.count - 1, 1))
+        Canvas { context, size in
+            let values = points.compactMap { $0.value }
+            guard values.count >= 2 else { return }
 
-            Path { p in
-                for (i, v) in values.enumerated() {
-                    let x = CGFloat(i) * stepX
-                    let y = h - CGFloat((v - minV) / span) * h
-                    if i == 0 { p.move(to: .init(x: x, y: y)) }
-                    else { p.addLine(to: .init(x: x, y: y)) }
+            let minV = (values.min() ?? 0)
+            let maxV = (values.max() ?? 100)
+            let span = max(maxV - minV, 1)
+
+            let stepX = size.width / CGFloat(max(points.count - 1, 1))
+            func y(_ v: Double) -> CGFloat {
+                let t = (v - minV) / span
+                return size.height * (1 - CGFloat(t))
+            }
+
+            var path = Path()
+            var started = false
+
+            for (idx, p) in points.enumerated() {
+                guard let v = p.value else { continue }
+                let x = CGFloat(idx) * stepX
+                let pt = CGPoint(x: x, y: y(v))
+                if !started {
+                    path.move(to: pt)
+                    started = true
+                } else {
+                    path.addLine(to: pt)
                 }
             }
-            .stroke(.primary.opacity(0.8), lineWidth: 2)
 
-            // 轻量"点"
-            ForEach(Array(values.enumerated()), id: \.0) { i, v in
-                let x = CGFloat(i) * stepX
-                let y = h - CGFloat((v - minV) / span) * h
-                Circle()
-                    .fill(Color.primary)
-                    .frame(width: 6, height: 6)
-                    .position(x: x, y: y)
+            context.stroke(path, with: .color(.accentColor), lineWidth: 2)
+
+            for (idx, p) in points.enumerated() {
+                guard let v = p.value else { continue }
+                let x = CGFloat(idx) * stepX
+                let pt = CGPoint(x: x, y: y(v))
+                let dot = Path(ellipseIn: CGRect(x: pt.x - 2.5, y: pt.y - 2.5, width: 5, height: 5))
+                context.fill(dot, with: .color(.accentColor))
             }
         }
+        .frame(height: 160)
     }
 }

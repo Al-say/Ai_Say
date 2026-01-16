@@ -88,20 +88,11 @@ final class RecordingViewModel: ObservableObject {
 
         Task {
             do {
-                let (resp, raw) = try await client.uploadAudio(fileURL: payload.fileURL, prompt: prompt)
+                let (resp, raw) = try await client.uploadAudio(fileURL: payload.fileURL, prompt: prompt, persona: PersonaStore.shared.current)
                 lastResp = resp
 
-                // 计算总分（0-100）
-                let score = (resp.fluency + resp.completeness + resp.relevance) / 3.0
-
-                // ✅ 保存到 SwiftData Item（复用）
-                let item = Item(timestamp: Date(), prompt: prompt, userText: nil)
-                item.isAudio = true
-                item.score = score
-                item.aiResponse = raw
-                item.audioPath = resp.audioUrl ?? payload.fileURL.path // 先用云端，没有就用本地
-                context.insert(item)
-                try? context.save()
+                // ✅ 使用统一保存逻辑
+                persistEval(resp: resp, prompt: prompt, isAudio: true, audioPath: payload.fileURL.path, rawJSON: raw, context: context)
 
                 state = .success(resp, payload.fileURL, raw)
             } catch {
@@ -115,5 +106,33 @@ final class RecordingViewModel: ObservableObject {
     func retry(context: ModelContext) {
         // 重置状态并重新上传
         uploadAndSave(context: context)
+    }
+
+    // ✅ 统一保存逻辑（录音/文本共用）
+    @MainActor
+    func persistEval(resp: TextEvalResp,
+                     prompt: String,
+                     isAudio: Bool,
+                     audioPath: String?,
+                     rawJSON: String,
+                     context: ModelContext) {
+        let item = Item(timestamp: Date(), prompt: prompt, userText: resp.userText)
+
+        // createdAt -> timestamp
+        if let createdAt = resp.createdAt,
+           let dt = ISO8601DateFormatter().date(from: createdAt) {
+            item.timestamp = dt
+        }
+
+        // score 优先 overallScore
+        let computed = (resp.fluency + resp.completeness + resp.relevance) / 3.0
+        item.score = resp.overallScore ?? computed
+
+        item.isAudio = isAudio
+        item.audioPath = audioPath ?? resp.audioUrl
+        item.aiResponse = rawJSON
+
+        context.insert(item)
+        try? context.save()
     }
 }

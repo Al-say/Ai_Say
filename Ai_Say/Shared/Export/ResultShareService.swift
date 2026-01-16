@@ -22,4 +22,10 @@ enum ResultShareService {
 
         return renderer.uiImage
     }
+
+    // ✅ audioUrl 拼接（相对路径）
+    static func resolveAudioURL(baseURL: String, audioPath: String) -> URL? {
+        if audioPath.hasPrefix("http") { return URL(string: audioPath) }
+        return URL(string: baseURL + audioPath)
+    }
 }

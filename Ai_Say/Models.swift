@@ -6,6 +6,7 @@ nonisolated struct TextEvalReq: Encodable, Sendable {
     let userText: String
     let expectedKeywords: [String]?
     let referenceAnswer: String?
+    let persona: String?
 }
 
 // ✅ Issue
@@ -24,6 +25,7 @@ nonisolated struct TextEvalResp: Decodable, Sendable {
     let fluency: Double
     let completeness: Double
     let relevance: Double
+    let overallScore: Double?  // 🆕 新增
 
     let grammarIssueCount: Int?
     let issues: [Issue]?
@@ -32,4 +34,5 @@ nonisolated struct TextEvalResp: Decodable, Sendable {
 
     let audioUrl: String?          // 🆕 后端新增
     let createdAt: String?
+    let userText: String?          // 🆕 新增
 }

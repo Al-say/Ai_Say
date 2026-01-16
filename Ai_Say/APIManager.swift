@@ -29,6 +29,10 @@ final class APIManager: ObservableObject {
                 if let prompt, !prompt.isEmpty {
                     form.append(Data(prompt.utf8), withName: "prompt")
                 }
+                
+                // Add persona
+                let persona = PersonaStore.shared.current.rawValue
+                form.append(Data(persona.utf8), withName: "persona")
             },
             to: url,
             method: .post
@@ -69,7 +73,7 @@ final class APIManager: ObservableObject {
     func evalText(prompt: String, userText: String) async throws -> TextEvalResp {
         let url = "\(baseURL)/api/eval/text"
         
-        let req = TextEvalReq(prompt: prompt, userText: userText, expectedKeywords: nil, referenceAnswer: nil)
+        let req = TextEvalReq(prompt: prompt, userText: userText, expectedKeywords: nil, referenceAnswer: nil, persona: PersonaStore.shared.current.rawValue)
         
         isLoading = true
         serverMessage = "评估中..."

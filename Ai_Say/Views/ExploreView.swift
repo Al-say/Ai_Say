@@ -2,20 +2,20 @@ import SwiftUI
 
 struct ExploreView: View {
     @EnvironmentObject private var router: AppRouter
-    @State private var query: String = ""
-    @State private var selectedLevel: Scenario.Level? = nil
 
-    private var all: [Scenario] { Scenario.samples }
+    // Scenes 状态
+    @State private var scenes: [SceneDTO] = []
+    @State private var scenesError: String?
 
-    private var filtered: [Scenario] {
-        all.filter { s in
-            let matchLevel = selectedLevel == nil || s.level == selectedLevel
-            let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            let matchQuery = q.isEmpty ||
-                s.title.localizedCaseInsensitiveContains(q) ||
-                s.subtitle.localizedCaseInsensitiveContains(q) ||
-                s.tags.contains(where: { $0.localizedCaseInsensitiveContains(q) })
-            return matchLevel && matchQuery
+    private func loadScenes() {
+        Task {
+            do {
+                scenesError = nil
+                let fetchedScenes = try await EvalAPIClient.shared.fetchScenes(persona: PersonaStore.shared.current)
+                scenes = fetchedScenes
+            } catch {
+                scenesError = "加载场景失败: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -23,27 +23,40 @@ struct ExploreView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Search
-                    searchBar
-
-                    // Chips
-                    levelChips
-
                     // Empty
-                    if filtered.isEmpty {
+                    if scenes.isEmpty && scenesError == nil {
                         emptyState
+                    } else if let error = scenesError {
+                        Text("错误: \(error)")
+                            .foregroundColor(.red)
+                            .padding()
                     } else {
                         // iPad：宽屏 3 列，窄屏 2 列（MVP 用 width 粗略判断）
                         GeometryReader { geo in
                             let cols = geo.size.width >= 900 ? 3 : 2
-                            StaggeredGrid(columns: cols, spacing: 12, data: filtered) { s in
-                                NavigationLink {
-                                    ScenarioDetailView(scenario: s) { scenario in
-                                        // 跳转到录音评估页
-                                        router.goToRecording(prompt: scenario.prompts.first ?? scenario.title)
-                                    }
+                            StaggeredGrid(columns: cols, spacing: 12, data: scenes) { scene in
+                                Button {
+                                    // 使用场景的 prompt 跳转到录音评估页
+                                    router.goToRecording(prompt: scene.prompt)
                                 } label: {
-                                    ScenarioCard(scenario: s)
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text(scene.title)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                        Text(scene.prompt)
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                        if let persona = scene.targetPersona {
+                                            Text("适合: \(persona)")
+                                                .font(.caption)
+                                                .foregroundColor(.accentColor)
+                                        }
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color(.secondarySystemBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -58,58 +71,12 @@ struct ExploreView: View {
             .navigationBarTitleDisplayMode(.large)
             .background(Color(.systemBackground))
         }
-    }
-
-    private var searchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("搜索场景 / 标签…", text: $query)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-            }
+        .onAppear {
+            loadScenes()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-
-    private var levelChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                chip(title: "全部", selected: selectedLevel == nil) {
-                    selectedLevel = nil
-                }
-                ForEach(Scenario.Level.allCases, id: \.rawValue) { lv in
-                    chip(title: lv.rawValue, selected: selectedLevel == lv) {
-                        selectedLevel = lv
-                    }
-                }
-            }
-            .padding(.vertical, 4)
+        .onChange(of: PersonaStore.shared.current) { _ in
+            loadScenes()
         }
-    }
-
-    private func chip(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(selected ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground))
-                .foregroundStyle(selected ? .primary : .secondary)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     private var emptyState: some View {
@@ -117,9 +84,9 @@ struct ExploreView: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 34, weight: .semibold))
                 .foregroundStyle(.secondary)
-            Text("没有匹配的场景")
+            Text("没有场景")
                 .font(.headline)
-            Text("尝试换个关键词或切换难度。")
+            Text("暂时没有可用的场景，请稍后再试。")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

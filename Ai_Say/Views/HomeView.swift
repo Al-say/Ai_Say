@@ -1,12 +1,32 @@
 import SwiftUI
 import SwiftData
 
+/// 快速入口模型
+struct QuickEntry: Identifiable {
+    enum Action {
+        case startRecording(prompt: String, persona: UserPersona? = nil)
+        case openPromptPicker
+        case switchTab(MainTab)
+    }
+
+    let id = UUID()
+    let title: String
+    let subtitle: String
+    let icon: String
+    let action: Action
+}
+
+/// 主页视图，展示用户的主要界面，包括任务、历史记录和快速入口
 struct HomeView: View {
     @EnvironmentObject var router: AppRouter
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
 
     @State private var dailyPrompt: String = "Describe your favorite childhood memory."
+
+    // 每日挑战状态
+    @State private var dailyChallenge: DailyChallengeDTO?
+    @State private var dailyChallengeError: String?
 
     // 💡 提取最近 5 条不重复的历史 Prompt
     private var historyPrompts: [String] {
@@ -19,9 +39,45 @@ struct HomeView: View {
         return unique
     }
 
+    // 快速入口数据
+    private var quickEntries: [QuickEntry] {
+        [
+            .init(
+                title: "职场面试",
+                subtitle: "面试题速练",
+                icon: "briefcase.fill",
+                action: .startRecording(
+                    prompt: "Tell me about yourself and your strengths.",
+                    persona: .careerGrowth
+                )
+            ),
+            .init(
+                title: "旅行社交",
+                subtitle: "机场/酒店/点餐",
+                icon: "airplane",
+                action: .startRecording(
+                    prompt: "You are at a hotel. Ask for an early check-in politely.",
+                    persona: .careerGrowth
+                )
+            ),
+            .init(
+                title: "自由表达",
+                subtitle: "不限主题",
+                icon: "quote.bubble.fill",
+                action: .startRecording(prompt: "Describe your day in detail.")
+            ),
+            .init(
+                title: "收藏题目",
+                subtitle: "题库与收藏",
+                icon: "star.fill",
+                action: .openPromptPicker
+            )
+        ]
+    }
+
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .center) {
                 ScrollView {
                     // 使用 ViewThatFits 处理 iPad 横竖屏自适应
                     ViewThatFits(in: .horizontal) {
@@ -58,11 +114,17 @@ struct HomeView: View {
                         .presentationDetents([.medium, .large])
                 }
             }
-            .onChange(of: router.sheetRoute) { newValue in
+            .onChange(of: router.sheetRoute) {
                 // 当 sheet 被系统关闭时（newValue == nil），做一次清理
-                if newValue == nil {
+                if $0 == nil {
                     router.dismissSheet()
                 }
+            }
+            .onAppear {
+                loadDailyChallenge()
+            }
+            .onChange(of: PersonaStore.shared.current) { _ in
+                loadDailyChallenge()
             }
         }
     }
@@ -71,40 +133,75 @@ struct HomeView: View {
     private var leftTaskColumn: some View {
         VStack(alignment: .leading, spacing: 20) {
             // 今日挑战卡片
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Label("今日挑战", systemImage: "sparkles")
+            if let challenge = dailyChallenge {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Label("今日挑战", systemImage: "sparkles")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(Color.accentColor)
+                        Spacer()
+                        Button("更换题目") {
+                            router.showPromptPicker() // ✅ 触发更稳健的路由
+                        }
+                            .font(.caption.bold())
+                    }
+
+                    Text(challenge.title)
+                        .font(.title3.bold())
+                        .lineLimit(3)
+
+                    Text(challenge.description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    HStack {
+                        Label(challenge.difficulty, systemImage: "gauge.medium")
+                        Label("建议 2min", systemImage: "clock")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(24)
+                .background(Color.accentColor.opacity(0.12)) // M3 Tonal 高亮
+                .clipShape(RoundedRectangle(cornerRadius: 28))
+            } else if let error = dailyChallengeError {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("今日挑战")
                         .font(.subheadline.bold())
                         .foregroundStyle(Color.accentColor)
-                    Spacer()
-                    Button("更换题目") {
-                        router.showPromptPicker() // ✅ 触发更稳健的路由
+                    Text("加载失败：\(error)")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    Button("重试") {
+                        loadDailyChallenge()
                     }
-                        .font(.caption.bold())
+                    .font(.caption.bold())
                 }
-
-                Text(dailyPrompt)
-                    .font(.title3.bold())
-                    .lineLimit(3)
-
-                HStack {
-                    Label("中级", systemImage: "gauge.medium")
-                    Label("建议 2min", systemImage: "clock")
+                .padding(24)
+                .background(Color.red.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 28))
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("今日挑战")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(Color.accentColor)
+                    ProgressView()
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .padding(24)
+                .background(Color.accentColor.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 28))
             }
-            .padding(24)
-            .background(Color.accentColor.opacity(0.12)) // M3 Tonal 高亮
-            .clipShape(RoundedRectangle(cornerRadius: 28))
 
             // 场景入口 2x2 Grid
             Text("快速练习").font(.headline).padding(.leading, 8)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                QuickEntryCard(title: "职场面试", icon: "briefcase.fill", color: .blue)
-                QuickEntryCard(title: "旅行社交", icon: "airplane", color: .orange)
-                QuickEntryCard(title: "自由表达", icon: "quote.bubble.fill", color: .purple)
-                QuickEntryCard(title: "收藏题目", icon: "star.fill", color: .yellow)
+                ForEach(quickEntries) { entry in
+                    QuickEntryCard(entry: entry) { tapped in
+                        handleQuickEntry(tapped)
+                    }
+                }
             }
         }
     }
@@ -149,7 +246,8 @@ struct HomeView: View {
     // MARK: - Primary CTA (FAB)
     private var primaryFAB: some View {
         Button {
-            router.goToRecording(prompt: dailyPrompt)
+            let prompt = dailyChallenge?.prompt ?? dailyPrompt
+            router.goToRecording(prompt: prompt)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "mic.fill")
@@ -165,9 +263,44 @@ struct HomeView: View {
             .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
         }
         .padding(32)
+        .offset(y: 100)
     }
 
     // MARK: - 辅助函数
+    private func handleQuickEntry(_ entry: QuickEntry) {
+        switch entry.action {
+        case .startRecording(let prompt, let persona):
+            if let persona { PersonaStore.shared.setPersona(persona) }
+            router.sheetRoute = .recording(prompt: prompt)
+
+        case .openPromptPicker:
+            router.sheetRoute = .changePrompt
+
+        case .switchTab(let tab):
+            router.selectedTab = tab
+        }
+    }
+
+    private func loadDailyChallenge() {
+        let persona = PersonaStore.shared.current
+
+        if let cached = DailyChallengeCache.load(persona: persona) {
+            dailyChallenge = cached
+            return
+        }
+
+        EvalAPIClient.shared.fetchDailyChallenge(persona: persona) { result in
+            switch result {
+            case .success(let dto):
+                self.dailyChallenge = dto
+                self.dailyChallengeError = nil
+                DailyChallengeCache.save(dto, persona: persona)
+            case .failure(let msg):
+                self.dailyChallengeError = msg
+            }
+        }
+    }
+
     private func scoreInt(_ item: Item) -> Int {
         // 兼容 Double? / nil
         let v = item.score ?? 0
@@ -213,36 +346,48 @@ struct HomeView: View {
 
 // MARK: - 辅助组件
 
+/// 快速练习入口卡片
 struct QuickEntryCard: View {
-    let title: String; let icon: String; let color: Color
-    @EnvironmentObject var router: AppRouter
+    let entry: QuickEntry
+    let onTap: (QuickEntry) -> Void
 
     var body: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(color.opacity(0.1))
-                    .frame(width: 80, height: 80)
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onTap(entry)
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.12))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: entry.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
 
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(color)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.title).font(.headline)
+                    Text(entry.subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.tertiary)
             }
-
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .padding(16)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .frame(maxWidth: .infinity)
-        .onTapGesture {
-            // 暂时打日志，后续可以跳转到对应场景
-            print("Tapped: \(title)")
-            // 示例：跳转到explore tab选择题目
-            router.selectedTab = .explore
-        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityLabel(entry.title)
+        .accessibilityHint(entry.subtitle)
     }
 }
 
+/// 分数圆形显示组件，带进度环
 struct ScoreMiniCircle: View {
     let score: Int; let label: String
 
@@ -270,6 +415,7 @@ struct ScoreMiniCircle: View {
     }
 }
 
+/// 空状态卡片，用于显示无数据时的提示
 struct EmptyStateCard: View {
     let text: String
     var body: some View {
