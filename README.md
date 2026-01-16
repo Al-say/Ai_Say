@@ -1,12 +1,37 @@
 # API 对接文档：文本评估接口（iOS 端）
 
-## 0. 功能说明
+## 0. 配置说明
+
+### BaseURL 配置
+
+所有前端请求统一使用 **8082端口**：
+
+- **模拟器调试**：自动使用 `http://localhost:8082`
+- **真机调试**：需配置电脑局域网IP，通过UserDefaults设置：
+  ```swift
+  UserDefaults.standard.set("192.168.0.104", forKey: "api_host")
+  ```
+  确保iPad/iPhone与电脑在同一Wi-Fi网络下。
+
+### 支持的API端点
+
+- `/api/eval/text` - 文本评估
+- `/api/eval/audio` - 音频评估
+- `/api/growth/history` - 成长历史
+- `/api/growth/analysis` - 成长分析
+- `/api/growth/detail/{id}` - 成长详情
+- `/api/home/dashboard` - 首页仪表板
+- `/api/explore/scenes` - 探索场景
+
+---
+
+## 1. 功能说明
 
 前端发送题目（prompt）与用户英语文本（userText），后端调用 DeepSeek 进行多维度评分、语法纠错并返回建议；并完成数据库入库。
 
 ---
 
-## 1. 接口定义
+## 2. 接口定义
 
 * **URL**：`http://localhost:8082/api/eval/text`
 
