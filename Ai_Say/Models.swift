@@ -1,12 +1,14 @@
 import Foundation
 
 // ✅ 请求模型：退出 MainActor 隔离，满足 Encodable & Sendable
+// 对应后端：POST /api/eval/text?persona=XXX  Body: {deviceId, prompt, userText}
 nonisolated struct TextEvalReq: Encodable, Sendable {
+    let deviceId: String      // 🆕 设备标识（必填）
     let prompt: String
     let userText: String
     let expectedKeywords: [String]?
     let referenceAnswer: String?
-    let persona: String?
+    // ⚠️ persona 已改为 Query 参数，不再放 Body
 }
 
 // ✅ Issue

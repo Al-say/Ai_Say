@@ -3,6 +3,11 @@ import SwiftUI
 struct ProfileView: View {
     @State private var notificationsEnabled = true
     @State private var darkModeEnabled = false
+    
+    // 🆕 云端统计数据
+    @State private var stats: ProfileStatsDTO?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -43,7 +48,27 @@ struct ProfileView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("个人中心")
             .navigationBarTitleDisplayMode(.large)
+            .refreshable {
+                await loadStats()
+            }
+            .task {
+                await loadStats()
+            }
         }
+    }
+    
+    // 🆕 加载云端统计数据
+    private func loadStats() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            stats = try await EvalAPIClient.shared.fetchProfileStats()
+            print("✅ Profile stats loaded: \(stats?.practiceCount ?? 0) 次练习")
+        } catch {
+            errorMessage = error.localizedDescription
+            print("❌ Profile stats error: \(error)")
+        }
+        isLoading = false
     }
 
     private var profileHeader: some View {
@@ -64,18 +89,24 @@ struct ProfileView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
 
-                    Text("已学习 45 天")
+                    // 🆕 使用云端数据
+                    Text("已练习 \(stats?.practiceCount ?? 0) 次")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
                     HStack(spacing: 16) {
-                        statItem("总时长", "12.5h")
-                        statItem("平均得分", "82")
-                        statItem("连续天数", "7")
+                        statItem("总时长", stats?.durationDisplay ?? "0m")
+                        statItem("连续天数", "\(stats?.streak ?? 0)")
                     }
                 }
 
                 Spacer()
+                
+                // 🆕 加载指示器
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
             }
         }
     }
@@ -89,9 +120,10 @@ struct ProfileView: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 12) {
-                statCard("本周练习", "8 次", .blue)
-                statCard("最佳得分", "95", .green)
-                statCard("进步幅度", "+12%", .orange)
+                // 🆕 使用云端数据
+                statCard("总练习", "\(stats?.practiceCount ?? 0) 次", .blue)
+                statCard("总时长", stats?.durationDisplay ?? "0m", .green)
+                statCard("连续打卡", "\(stats?.streak ?? 0) 天", .orange)
             }
         }
     }

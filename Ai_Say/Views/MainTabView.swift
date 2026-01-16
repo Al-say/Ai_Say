@@ -18,7 +18,7 @@ enum MainTab: Int, CaseIterable {
     var icon: String {
         switch self {
         case .home: return "house"
-        case .growth: return "chart.xyaxis.axis"  // 使用有fill变体的图标
+        case .growth: return "chart.bar"  // 使用有 .fill 变体的图标
         case .explore: return "safari"
         case .profile: return "person.crop.circle"
         }

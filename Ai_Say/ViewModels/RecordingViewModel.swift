@@ -88,7 +88,13 @@ final class RecordingViewModel: ObservableObject {
 
         Task {
             do {
-                let (resp, raw) = try await client.uploadAudio(fileURL: payload.fileURL, prompt: prompt, persona: PersonaStore.shared.current)
+                // ✅ 使用完整音频评估接口 /api/eval/audio/full
+                // 包含：转码 → ASR → DeepSeek AI 评估 → 入库
+                let (resp, raw) = try await client.uploadFullAudio(
+                    fileURL: payload.fileURL,
+                    scene: prompt,  // 将 prompt 作为 scene 传递
+                    persona: PersonaStore.shared.current
+                )
                 lastResp = resp
 
                 // ✅ 使用统一保存逻辑

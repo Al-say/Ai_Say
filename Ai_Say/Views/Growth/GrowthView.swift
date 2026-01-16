@@ -10,100 +10,161 @@ struct GrowthView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 16) {
-                        leftColumn
-                            .frame(maxWidth: 540)
-                        rightColumn
-                            .frame(maxWidth: .infinity)
-                    }
-                    .padding(16)
+                // 🆕 加载状态
+                if vm.isLoading {
+                    ProgressView("正在从云端加载...")
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else if let error = vm.errorMessage {
+                    errorView(error)
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 16) {
+                            leftColumn
+                                .frame(maxWidth: 540)
+                            rightColumn
+                                .frame(maxWidth: .infinity)
+                        }
+                        .padding(16)
 
-                    VStack(spacing: 16) {
-                        leftColumn
-                        rightColumn
+                        VStack(spacing: 16) {
+                            leftColumn
+                            rightColumn
+                        }
+                        .padding(16)
                     }
-                    .padding(16)
                 }
-                .padding(.bottom, 120)
+                
+                // 🆕 历史记录列表 (云端数据)
+                if !vm.historyRecords.isEmpty {
+                    historySection
+                        .padding(.horizontal, 16)
+                }
+                
+                Spacer().frame(height: 120)
             }
             .navigationTitle("成长")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Debug Seed") {
-                        Task { @MainActor in
-                            seed3Items(context: context)
+                    // 🆕 数据源切换
+                    Menu {
+                        Button("刷新云端") {
+                            Task { await vm.loadFromCloud() }
                         }
+                        Divider()
+                        Picker("数据源", selection: $vm.dataSource) {
+                            ForEach(GrowthViewModel.DataSource.allCases) { source in
+                                Text(source.rawValue).tag(source)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.triangle.2.circlepath")
                     }
                 }
             }
-            .onAppear { vm.rebuild(from: items) }
+            .refreshable {
+                // 🆕 下拉刷新
+                await vm.loadFromCloud()
+            }
+            .task {
+                // 🆕 页面加载时自动拉取云端数据
+                if vm.dataSource == .cloud {
+                    await vm.loadFromCloud()
+                }
+            }
+            .onChange(of: vm.dataSource) { _, newValue in
+                if newValue == .local {
+                    vm.rebuild(from: items)
+                } else {
+                    Task { await vm.loadFromCloud() }
+                }
+            }
             .onChange(of: items) { _, newValue in
-                vm.rebuild(from: newValue)
+                if vm.dataSource == .local {
+                    vm.rebuild(from: newValue)
+                }
             }
             .onChange(of: vm.rangeMode) { _, _ in
-                vm.rebuild(from: items)
+                if vm.dataSource == .local {
+                    vm.rebuild(from: items)
+                }
             }
         }
     }
-
-    @MainActor
-    private func seed3Items(context: ModelContext) {
-        // 清理旧数据（只在测试环境用）
-        let fetch = FetchDescriptor<Item>()
-        if let existing = try? context.fetch(fetch) {
-            existing.forEach { context.delete($0) }
-        }
-
-        let cal = Calendar.current
-        let today = Date()
-        let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
-        let sevenDaysAgo = cal.date(byAdding: .day, value: -7, to: today)!
-
-        func makeAIResponse(f: Double, c: Double, r: Double) -> String {
-            """
-            {"fluency":\(f),"completeness":\(c),"relevance":\(r),"issues":[],"suggestions":["Keep going"]}
-            """
-        }
-
-        let a = Item(timestamp: sevenDaysAgo, prompt: "P1", userText: nil)
-        a.isAudio = true
-        a.score = 60
-        a.aiResponse = makeAIResponse(f: 55, c: 65, r: 60)
-
-        let b = Item(timestamp: yesterday, prompt: "P2", userText: nil)
-        b.isAudio = true
-        b.score = 80
-        b.aiResponse = makeAIResponse(f: 82, c: 75, r: 83)
-
-        let c = Item(timestamp: today, prompt: "P3", userText: nil)
-        c.isAudio = true
-        c.score = 90
-        c.aiResponse = makeAIResponse(f: 92, c: 88, r: 90)
-
-        context.insert(a)
-        context.insert(b)
-        context.insert(c)
-
-        try? context.save()
-
-        // 立即读取并触发 vm rebuild，打印结果
-        let fetch2 = FetchDescriptor<Item>()
-        if let fresh = try? context.fetch(fetch2) {
-            vm.rebuild(from: fresh)
-
-            // 打印 trendPoints
-            print("DEBUG: trendPoints:")
-            for p in vm.trendPoints {
-                print("- \(p.label) : \(String(describing: p.value))")
+    
+    // 🆕 错误视图
+    private func errorView(_ message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40))
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("重试") {
+                Task { await vm.loadFromCloud() }
             }
-
-            // 打印 radar dimensions
-            print("DEBUG: radarDimensions:")
-            for d in vm.radarDims {
-                print("- \(d.key) : \(d.value)")
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, minHeight: 200)
+        .padding()
+    }
+    
+    // 🆕 历史记录列表
+    private var historySection: some View {
+        tonalCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("练习记录").font(.headline)
+                    Spacer()
+                    Text("\(vm.historyRecords.count) 条")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Divider()
+                
+                ForEach(vm.historyRecords.prefix(10)) { record in
+                    historyRow(record)
+                    if record.id != vm.historyRecords.prefix(10).last?.id {
+                        Divider()
+                    }
+                }
             }
         }
+    }
+    
+    private func historyRow(_ record: GrowthHistoryItem) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                // 优先显示 prompt，否则显示日期 + ID
+                Text(record.prompt ?? "练习 #\(record.id)")
+                    .font(.subheadline)
+                    .lineLimit(1)
+                Text(formatDate(record.createdAt))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("\(Int(record.overallScore ?? 0))")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(scoreColor(record.overallScore ?? 0))
+        }
+        .padding(.vertical, 4)
+    }
+    
+    private func formatDate(_ dateString: String) -> String {
+        if let range = dateString.range(of: "T") {
+            return String(dateString[..<range.lowerBound])
+        }
+        return dateString
+    }
+    
+    private func scoreColor(_ score: Double) -> Color {
+        if score >= 80 { return .green }
+        if score >= 60 { return .orange }
+        return .red
     }
 
     private var leftColumn: some View {
@@ -196,7 +257,7 @@ struct GrowthView: View {
 
     private func emptyHint(_ text: String, actionText: String? = nil, action: (() -> Void)? = nil) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "chart.xyaxis.axis")
+            Image(systemName: "chart.bar")
                 .font(.system(size: 32))
                 .foregroundStyle(.secondary.opacity(0.5))
 

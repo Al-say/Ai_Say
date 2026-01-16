@@ -71,9 +71,15 @@ final class APIManager: ObservableObject {
     }
 
     func evalText(prompt: String, userText: String) async throws -> TextEvalResp {
-        let url = "\(baseURL)/api/eval/text"
+        let url = "\(baseURL)/api/eval/text?persona=\(PersonaStore.shared.current.rawValue)"
         
-        let req = TextEvalReq(prompt: prompt, userText: userText, expectedKeywords: nil, referenceAnswer: nil, persona: PersonaStore.shared.current.rawValue)
+        let req = TextEvalReq(
+            deviceId: DeviceIdManager.shared.deviceId,
+            prompt: prompt,
+            userText: userText,
+            expectedKeywords: nil,
+            referenceAnswer: nil
+        )
         
         isLoading = true
         serverMessage = "评估中..."

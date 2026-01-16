@@ -10,17 +10,30 @@ enum Endpoints {
         "http://\(host):8082"
     }
 
-    static let evalAudio = "/api/eval/audio"
-    static let evalText  = "/api/eval/text"
+    // 评估模块
+    static let evalAudio     = "/api/eval/audio"
+    static let evalAudioFull = "/api/eval/audio/full"  // 完整音频评估（推荐）
+    static let evalText      = "/api/eval/text"
 
+    // 成长模块
     static let growthHistory  = "/api/growth/history"
     static let growthAnalysis = "/api/growth/analysis"
     static let growthDetail   = "/api/growth/detail" // + "/{id}"
 
-    static let homeDashboard  = "/api/home/dashboard"
+    // 首页模块
+    static let homeDaily      = "/api/home/daily"     // ✅ 修正路径
+
+    // 探索模块
     static let exploreScenes  = "/api/explore/scenes"
 
-    static let uploadsPrefix = "/uploads/"
+    // 个人中心模块
+    static let profile        = "/api/profile"
+    static let profileStats   = "/api/profile/stats"
+
+    // 音频上传
+    static let audioUpload    = "/api/audio/upload"
+
+    static let uploadsPrefix  = "/uploads/"
 
     static func url(_ path: String) -> String {
         "\(baseURL)\(path)"
