@@ -5,6 +5,7 @@ struct GrowthView: View {
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
     @StateObject private var vm = GrowthViewModel()
     @Environment(\.modelContext) private var context
+    @EnvironmentObject private var router: AppRouter
 
     var body: some View {
         NavigationStack {
@@ -134,7 +135,9 @@ struct GrowthView: View {
                     }
 
                     if vm.trendPoints.compactMap({ $0.value }).count < 2 {
-                        emptyHint("练习次数不足，完成更多练习后解锁趋势图")
+                        emptyHint("练习次数不足，完成更多练习后解锁趋势图",
+                                 actionText: "开始练习",
+                                 action: { router.selectedTab = .home })
                     } else {
                         SimpleLineChart(points: vm.trendPoints)
                         axisLabels(vm.trendPoints)
@@ -151,7 +154,9 @@ struct GrowthView: View {
                     Text("能力雷达").font(.headline)
 
                     if vm.radarDims.isEmpty {
-                        emptyHint("暂无可用维度数据（需要保存 aiResponse 或至少有 1 条评估记录）")
+                        emptyHint("暂无可用维度数据，开始你的第一次评估吧！",
+                                 actionText: "开始评估",
+                                 action: { router.selectedTab = .home })
                     } else {
                         ViewThatFits(in: .horizontal) {
                             HStack(alignment: .top, spacing: 16) {
@@ -189,13 +194,33 @@ struct GrowthView: View {
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
-    private func emptyHint(_ text: String) -> some View {
-        Text(text)
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 80, alignment: .center)
-            .background(Color(.tertiarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    private func emptyHint(_ text: String, actionText: String? = nil, action: (() -> Void)? = nil) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 32))
+                .foregroundStyle(.secondary.opacity(0.5))
+
+            Text(text)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            if let actionText, let action {
+                Button(action: action) {
+                    Text(actionText)
+                        .font(.subheadline)
+                        .foregroundStyle(.blue)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(Capsule())
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+        .padding(16)
+        .background(Color(.tertiarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func axisLabels(_ points: [TrendPoint]) -> some View {

@@ -1,5 +1,6 @@
 // Services/Network/EvalAPIClient.swift
 import Foundation
+import Alamofire
 
 enum EvalAPIError: Error, LocalizedError {
     case invalidURL
@@ -167,54 +168,56 @@ final class EvalAPIClient: Sendable {
 extension EvalAPIClient {
 
     func fetchDailyChallenge(
-        persona: UserPersona,
-        completion: @escaping @MainActor (Result<DailyChallengeDTO, String>) -> Void
-    ) {
+        persona: UserPersona
+    ) async throws -> DailyChallengeDTO {
         let url = "\(baseURL)/api/home/daily-challenge"
 
-        AF.request(url, method: .get, parameters: ["persona": persona.rawValue])
-            .responseData { resp in
-                let code = resp.response?.statusCode ?? 0
-                let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+        return try await withCheckedThrowingContinuation { continuation in
+            AF.request(url, method: .get, parameters: ["persona": persona.rawValue])
+                .responseData { resp in
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
 
-                Task { @MainActor in
-                    guard (200..<300).contains(code) else {
-                        completion(.failure("DailyChallenge 请求失败(\(code))：\(raw)"))
-                        return
-                    }
-                    do {
-                        let dto = try JSONDecoder().decode(DailyChallengeDTO.self, from: resp.data ?? Data())
-                        completion(.success(dto))
-                    } catch {
-                        completion(.failure("DailyChallenge 解析失败：\(error.localizedDescription)\n\(raw)"))
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            let dto = try JSONDecoder().decode(DailyChallengeDTO.self, from: resp.data ?? Data())
+                            continuation.resume(returning: dto)
+                        } catch {
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("DailyChallenge 解析失败：\(error.localizedDescription)\n\(raw)"))
+                        }
                     }
                 }
-            }
+        }
     }
 
     func fetchScenes(
-        persona: UserPersona,
-        completion: @escaping @MainActor (Result<[SceneDTO], String>) -> Void
-    ) {
+        persona: UserPersona
+    ) async throws -> [SceneDTO] {
         let url = "\(baseURL)/api/explore/scenes"
 
-        AF.request(url, method: .get, parameters: ["persona": persona.rawValue])
-            .responseData { resp in
-                let code = resp.response?.statusCode ?? 0
-                let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+        return try await withCheckedThrowingContinuation { continuation in
+            AF.request(url, method: .get, parameters: ["persona": persona.rawValue])
+                .responseData { resp in
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
 
-                Task { @MainActor in
-                    guard (200..<300).contains(code) else {
-                        completion(.failure("Scenes 请求失败(\(code))：\(raw)"))
-                        return
-                    }
-                    do {
-                        let list = try JSONDecoder().decode([SceneDTO].self, from: resp.data ?? Data())
-                        completion(.success(list))
-                    } catch {
-                        completion(.failure("Scenes 解析失败：\(error.localizedDescription)\n\(raw)"))
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            let list = try JSONDecoder().decode([SceneDTO].self, from: resp.data ?? Data())
+                            continuation.resume(returning: list)
+                        } catch {
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("Scenes 解析失败：\(error.localizedDescription)\n\(raw)"))
+                        }
                     }
                 }
-            }
+        }
     }
 }

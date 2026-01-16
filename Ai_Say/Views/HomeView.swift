@@ -289,14 +289,14 @@ struct HomeView: View {
             return
         }
 
-        EvalAPIClient.shared.fetchDailyChallenge(persona: persona) { result in
-            switch result {
-            case .success(let dto):
+        Task {
+            do {
+                let dto = try await EvalAPIClient.shared.fetchDailyChallenge(persona: persona)
                 self.dailyChallenge = dto
                 self.dailyChallengeError = nil
                 DailyChallengeCache.save(dto, persona: persona)
-            case .failure(let msg):
-                self.dailyChallengeError = msg
+            } catch {
+                self.dailyChallengeError = error.localizedDescription
             }
         }
     }
