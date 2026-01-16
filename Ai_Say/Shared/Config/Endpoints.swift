@@ -2,7 +2,8 @@ import Foundation
 
 enum Endpoints {
     static var host: String {
-        UserDefaults.standard.string(forKey: "api_host") ?? "localhost"
+        // 真机调试：设置为电脑局域网IP，例如 192.168.0.104
+        UserDefaults.standard.string(forKey: "api_host") ?? "192.168.0.104"
     }
 
     static var baseURL: String {

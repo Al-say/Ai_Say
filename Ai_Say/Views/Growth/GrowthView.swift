@@ -196,7 +196,7 @@ struct GrowthView: View {
 
     private func emptyHint(_ text: String, actionText: String? = nil, action: (() -> Void)? = nil) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
+            Image(systemName: "chart.xyaxis.axis")
                 .font(.system(size: 32))
                 .foregroundStyle(.secondary.opacity(0.5))
 
