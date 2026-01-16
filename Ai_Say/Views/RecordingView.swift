@@ -2,7 +2,7 @@
 import SwiftUI
 import SwiftData
 import AVKit
-
+    // For audio playback
 struct RecordingView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var vm: RecordingViewModel
@@ -16,7 +16,7 @@ struct RecordingView: View {
             initialPrompt: initialPrompt.isEmpty ? "Describe your day." : initialPrompt
         ))
     }
-
+    // MARK: - Body
     var body: some View {
         GeometryReader { geo in
             let isWide = geo.size.width >= 900
@@ -262,7 +262,7 @@ struct RecordingView: View {
             return "开始录音"
         }
     }
-
+    // MARK: - Audio Playback Helpers
     private var recordButtonIcon: String {
         switch vm.state {
         case .recording:
