@@ -11,7 +11,7 @@ Ai_Say is a SwiftUI iOS app for AI-powered text evaluation. It integrates with a
   - `Models.swift`: Data models (TextEvalReq, TextEvalResp, etc.)
   - `Item.swift`: SwiftData model for local storage
 
-- **Data Flow**: User input in views → APIManager sends requests to backend (localhost:8082/api/eval/text) → Parse TextEvalResp → Update UI
+- **Data Flow**: User input in views → APIManager sends requests to backend (115.191.38.164:2580/api/eval/text) → Parse TextEvalResp → Update UI
 
 ## Key Patterns
 - **Concurrency**: Use `Sendable` for all data models to ensure thread safety in Swift 6
@@ -32,7 +32,7 @@ Ai_Say is a SwiftUI iOS app for AI-powered text evaluation. It integrates with a
 - **Build**: Open `Ai_Say.xcodeproj` in Xcode, select target and build
 - **Run**: Use Xcode simulator or device
 - **Test**: Run `Ai_SayTests` and `Ai_SayUITests` from Xcode
-- **Debug**: Backend runs on localhost:8082; check `APIManager.baseURL`
+- **Debug**: Backend runs on 115.191.38.164:2580; check `APIManager.baseURL`
 
 ## Conventions
 - Comments reference corresponding Java backend classes (e.g., `// 对应 Java: EvalDTO.TextEvalReq`)

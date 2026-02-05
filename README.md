@@ -4,19 +4,19 @@
 
 ### BaseURL 配置
 
-所有前端请求统一使用 **8082端口**：
+所有前端请求统一使用 **2580端口**：
 
-- **模拟器调试**：设置 `UserDefaults` 的 `api_host` 为 `"localhost"`
+- **模拟器调试**：设置 `UserDefaults` 的 `api_host` 为 `"115.191.38.164"`
   ```swift
-  UserDefaults.standard.set("localhost", forKey: "api_host")
+  UserDefaults.standard.set("115.191.38.164", forKey: "api_host")
   ```
-- **真机调试**：设置 `UserDefaults` 的 `api_host` 为电脑局域网IP
+- **真机调试**：设置 `UserDefaults` 的 `api_host` 为服务器IP
   ```swift
-  UserDefaults.standard.set("192.168.0.104", forKey: "api_host")  // 替换为你的电脑IP
+  UserDefaults.standard.set("115.191.38.164", forKey: "api_host")  // 生产服务器IP
   ```
-  确保iPad/iPhone与电脑在同一Wi-Fi网络下。
+  确保设备与服务器网络连通。
 
-**重要**：真机不能使用 `localhost`，必须使用后端机器的实际局域网IP！
+**重要**：后端已部署到生产服务器 `115.191.38.164:2580`！
 
 ### 支持的API端点
 
@@ -38,9 +38,9 @@
 
 ## 2. 接口定义
 
-* **URL**：`http://localhost:8082/api/eval/text`
+* **URL**：`http://115.191.38.164:2580/api/eval/text`
 
-  * **真机调试**：把 `localhost` 改成电脑局域网 IP（如 `http://192.168.1.5:8082`），并确保手机/电脑同一 Wi-Fi
+  * **生产环境**：使用服务器IP `http://115.191.38.164:2580`
 * **Method**：`POST`
 * **Content-Type**：`application/json`
 
@@ -159,8 +159,8 @@ final class APIManager: ObservableObject {
     static let shared = APIManager()
     private init() {}
 
-    // 模拟器：localhost；真机：改为 Mac 局域网 IP
-    private let baseURL = "http://localhost:8082"
+    // 生产环境：服务器IP
+    private let baseURL = "http://115.191.38.164:2580"
 
     @Published var isLoading = false
     @Published var serverMessage = "准备就绪"
@@ -211,8 +211,7 @@ final class APIManager: ObservableObject {
 
 ## 6. 联调自检（iOS 侧）
 
-* 模拟器：`localhost:8082` 可直接访问
-* 真机：`http://<MacIP>:8082/api/eval/text`
-* iPad Safari 先打开 `http://<MacIP>:8082/api/test` 验证网络可达，再跑 App
+* 模拟器/真机：`http://115.191.38.164:2580` 可直接访问
+* Safari 先打开 `http://115.191.38.164:2580/api/test` 验证网络可达，再跑 App
 
 ---

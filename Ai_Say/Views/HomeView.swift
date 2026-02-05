@@ -18,15 +18,18 @@ struct QuickEntry: Identifiable {
 
 /// 主页视图，展示用户的主要界面，包括任务、历史记录和快速入口
 struct HomeView: View {
+    // MARK: - Properties
     @EnvironmentObject var router: AppRouter
     @Environment(\.modelContext) private var modelContext
+
+    // 🧠 引入 ViewModel (MVVM)
+    @StateObject private var vm = HomeViewModel()
+
+    // 💾 历史记录依然从 SwiftData 读取 (作为本地缓存的单一事实来源)
+    // 假设你在 ResultView 中已经把评估结果保存到了 SwiftData 的 Item 模型中
     @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
 
-    @State private var dailyPrompt: String = "Describe your favorite childhood memory."
-
-    // 每日挑战状态
-    @State private var dailyChallenge: DailyChallengeDTO?
-    @State private var dailyChallengeError: String?
+    @State private var defaultPrompt: String = "Describe your favorite childhood memory."
 
     // 💡 提取最近 5 条不重复的历史 Prompt
     private var historyPrompts: [String] {
@@ -39,43 +42,35 @@ struct HomeView: View {
         return unique
     }
 
-    // 快速入口数据
+    // 静态配置：快速入口
     private var quickEntries: [QuickEntry] {
         [
-            .init(
-                title: "职场面试",
-                subtitle: "面试题速练",
-                icon: "briefcase.fill",
-                action: .startRecording(
-                    prompt: "Tell me about yourself and your strengths.",
-                    persona: .careerGrowth
-                )
-            ),
-            .init(
-                title: "旅行社交",
-                subtitle: "机场/酒店/点餐",
-                icon: "airplane",
-                action: .startRecording(
-                    prompt: "You are at a hotel. Ask for an early check-in politely.",
-                    persona: .careerGrowth
-                )
-            ),
-            .init(
-                title: "自由表达",
-                subtitle: "不限主题",
-                icon: "quote.bubble.fill",
-                action: .startRecording(prompt: "Describe your day in detail.")
-            ),
-            .init(
-                title: "收藏题目",
-                subtitle: "题库与收藏",
-                icon: "star.fill",
-                action: .openPromptPicker
-            )
+            .init(title: "职场面试", subtitle: "面试题速练", icon: "briefcase.fill",
+                  action: .startRecording(prompt: "Tell me about yourself and your strengths.", persona: .careerGrowth)),
+            .init(title: "旅行社交", subtitle: "机场/酒店/点餐", icon: "airplane",
+                  action: .startRecording(prompt: "You are at a hotel. Ask for an early check-in politely.", persona: .dailyLife)), // 修正 persona
+            .init(title: "自由表达", subtitle: "不限主题", icon: "quote.bubble.fill",
+                  action: .startRecording(prompt: "Describe your day in detail.")),
+            .init(title: "收藏题目", subtitle: "题库与收藏", icon: "star.fill",
+                  action: .openPromptPicker)
         ]
     }
 
+    // MARK: - Body
     var body: some View {
+        mainContentView
+            // 🚀 核心生命周期：页面出现时加载数据
+            .task {
+                await vm.fetchDailyChallenge()
+            }
+            // 当 Sheet 关闭时清理路由状态
+            .onChange(of: router.sheetRoute) { _, newValue in
+                if newValue == nil { router.dismissSheet() }
+            }
+    }
+
+    // MARK: - 主内容视图
+    private var mainContentView: some View {
         NavigationStack {
             ZStack(alignment: .center) {
                 ScrollView {
@@ -110,45 +105,135 @@ struct HomeView: View {
                     RecordingView(initialPrompt: prompt)
 
                 case .changePrompt:
-                    PromptPickerSheet(currentPrompt: $dailyPrompt, historyPrompts: historyPrompts)
+                    PromptPickerSheet(currentPrompt: $defaultPrompt, historyPrompts: historyPrompts)
                         .presentationDetents([.medium, .large])
                 }
-            }
-            .onChange(of: router.sheetRoute) {
-                // 当 sheet 被系统关闭时（newValue == nil），做一次清理
-                if $0 == nil {
-                    router.dismissSheet()
-                }
-            }
-            .onAppear {
-                loadDailyChallenge()
-            }
-            .onChange(of: PersonaStore.shared.current) { _ in
-                loadDailyChallenge()
             }
         }
     }
 
-    // MARK: - 左侧：任务流 (Task Column)
+    // MARK: - Left Column: Task Flow
     private var leftTaskColumn: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // 今日挑战卡片
-            if let challenge = dailyChallenge {
+            // 1. 今日挑战卡片 (绑定 ViewModel 数据)
+            DailyChallengeCardView(
+                challenge: vm.dailyChallenge,
+                isLoading: vm.isLoading,
+                error: vm.errorMessage,
+                onRetry: {
+                    Task { await vm.fetchDailyChallenge() }
+                },
+                onChangePrompt: {
+                    router.showPromptPicker()
+                }
+            )
+
+            // 2. 快速入口 Grid
+            Text("快速练习").font(.headline).padding(.leading, 8)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(quickEntries) { entry in
+                    QuickEntryCard(entry: entry) { handleQuickEntry($0) }
+                }
+            }
+        }
+    }
+
+    // MARK: - Right Column: Info Flow
+    private var rightInfoColumn: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // 1. 最近表现 (绑定 SwiftData 实时数据)
+            if let lastItem = items.first {
+                RecentPerformanceCard(item: lastItem)
+            } else {
+                EmptyStateCard(text: "完成第一次练习后\n解锁成长报告")
+            }
+
+            // 2. 历史记录预览
+            Text("练习记录").font(.headline)
+            HistoryPreviewList(items: Array(items.prefix(3)), onSeeAll: {
+                router.selectedTab = .growth
+            })
+            .padding(16)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+        }
+    }
+
+    // MARK: - Primary CTA (FAB)
+    private var primaryFAB: some View {
+        Button {
+            // 🔥 这里使用了 ViewModel 中的真实数据
+            let promptToUse = vm.getActivePrompt(defaultPrompt: defaultPrompt)
+            router.goToRecording(prompt: promptToUse)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "mic.fill")
+                    .font(.title2)
+                Text("开始练习")
+                    .fontWeight(.bold)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+            .background(Color.accentColor)
+            .foregroundStyle(.white)
+            .clipShape(Capsule())
+            .shadow(color: .accentColor.opacity(0.4), radius: 10, y: 5)
+        }
+        .padding(32)
+        .frame(maxHeight: .infinity, alignment: .bottom) // 确保固定在底部
+    }
+
+    // MARK: - Actions
+    private func handleQuickEntry(_ entry: QuickEntry) {
+        switch entry.action {
+        case .startRecording(let prompt, let persona):
+            if let persona { PersonaStore.shared.setPersona(persona) }
+            router.sheetRoute = .recording(prompt: prompt)
+        case .openPromptPicker:
+            router.sheetRoute = .changePrompt
+        case .switchTab(let tab):
+            router.selectedTab = tab
+        }
+    }
+
+    // MARK: - 认证相关方法
+
+
+
+    // MARK: - 登录视图
+
+
+    // 处理 Apple 登录
+}
+
+// MARK: - Subviews (Refactored for Cleanliness)
+
+/// 抽取出来的今日挑战卡片，使主 View 更整洁
+struct DailyChallengeCardView: View {
+    let challenge: DailyChallengeDTO?
+    let isLoading: Bool
+    let error: String?
+    let onRetry: () -> Void
+    let onChangePrompt: () -> Void
+
+    var body: some View {
+        Group {
+            if let challenge = challenge {
+                // 成功状态
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         Label("今日挑战", systemImage: "sparkles")
                             .font(.subheadline.bold())
                             .foregroundStyle(Color.accentColor)
                         Spacer()
-                        Button("更换题目") {
-                            router.showPromptPicker() // ✅ 触发更稳健的路由
-                        }
+                        Button("更换题目", action: onChangePrompt)
                             .font(.caption.bold())
                     }
 
                     Text(challenge.title)
                         .font(.title3.bold())
                         .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true) // 防止被截断
 
                     Text(challenge.description)
                         .font(.subheadline)
@@ -163,183 +248,128 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
                 }
                 .padding(24)
-                .background(Color.accentColor.opacity(0.12)) // M3 Tonal 高亮
-                .clipShape(RoundedRectangle(cornerRadius: 28))
-            } else if let error = dailyChallengeError {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("今日挑战")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(Color.accentColor)
-                    Text("加载失败：\(error)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                    Button("重试") {
-                        loadDailyChallenge()
-                    }
-                    .font(.caption.bold())
-                }
-                .padding(24)
-                .background(Color.red.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 28))
-            } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("今日挑战")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(Color.accentColor)
-                    ProgressView()
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-                .padding(24)
                 .background(Color.accentColor.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 28))
-            }
 
-            // 场景入口 2x2 Grid
-            Text("快速练习").font(.headline).padding(.leading, 8)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(quickEntries) { entry in
-                    QuickEntryCard(entry: entry) { tapped in
-                        handleQuickEntry(tapped)
-                    }
+            } else if let error = error {
+                // 错误状态
+                VStack(alignment: .leading, spacing: 16) {
+                    Label("网络连接中断", systemImage: "wifi.slash")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.red)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("点击重试", action: onRetry)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                 }
-            }
-        }
-    }
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 28))
 
-    // MARK: - 右侧：复盘流 (Info Column)
-    private var rightInfoColumn: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // 最近一次结果快照
-            if let lastItem = items.first {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("最近表现").font(.headline)
-
-                    HStack(spacing: 15) {
-                        ScoreMiniCircle(score: scoreInt(lastItem), label: "总分")
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("上次练习：\(lastItem.timestamp.formatted(.dateTime.month().day().hour().minute()))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text("进步显著，继续保持！")
-                                .font(.caption.bold())
-                                .foregroundStyle(.green)
-                        }
-                    }
-                    .padding(16)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                }
             } else {
-                // 空态显示
-                EmptyStateCard(text: "完成第一次练习后\n解锁成长报告")
-            }
-
-            // 历史列表预览
-            Text("练习记录").font(.headline)
-            historyPreviewList
-                .padding(16)
+                // 加载状态 (骨架屏效果)
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Rectangle().fill(Color.gray.opacity(0.2)).frame(width: 80, height: 20).cornerRadius(4)
+                        Spacer()
+                    }
+                    Rectangle().fill(Color.gray.opacity(0.2)).frame(height: 24).cornerRadius(4)
+                    Rectangle().fill(Color.gray.opacity(0.2)).frame(height: 24).cornerRadius(4).padding(.trailing, 40)
+                    Rectangle().fill(Color.gray.opacity(0.2)).frame(height: 40).cornerRadius(4)
+                }
+                .padding(24)
                 .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-        }
-    }
-
-    // MARK: - Primary CTA (FAB)
-    private var primaryFAB: some View {
-        Button {
-            let prompt = dailyChallenge?.prompt ?? dailyPrompt
-            router.goToRecording(prompt: prompt)
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "mic.fill")
-                    .font(.title2)
-                Text("开始练习")
-                    .fontWeight(.bold)
+                .clipShape(RoundedRectangle(cornerRadius: 28))
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 18)
-            .background(Color.accentColor)
-            .foregroundStyle(.white)
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
         }
-        .padding(32)
-        .offset(y: 100)
+        .animation(.spring(), value: isLoading)
     }
+}
 
-    // MARK: - 辅助函数
-    private func handleQuickEntry(_ entry: QuickEntry) {
-        switch entry.action {
-        case .startRecording(let prompt, let persona):
-            if let persona { PersonaStore.shared.setPersona(persona) }
-            router.sheetRoute = .recording(prompt: prompt)
+/// 最近表现卡片
+struct RecentPerformanceCard: View {
+    let item: Item
 
-        case .openPromptPicker:
-            router.sheetRoute = .changePrompt
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("最近表现").font(.headline)
 
-        case .switchTab(let tab):
-            router.selectedTab = tab
-        }
-    }
-
-    private func loadDailyChallenge() {
-        let persona = PersonaStore.shared.current
-
-        if let cached = DailyChallengeCache.load(persona: persona) {
-            dailyChallenge = cached
-            return
-        }
-
-        Task {
-            do {
-                let dto = try await EvalAPIClient.shared.fetchDailyChallenge(persona: persona)
-                self.dailyChallenge = dto
-                self.dailyChallengeError = nil
-                DailyChallengeCache.save(dto, persona: persona)
-            } catch {
-                self.dailyChallengeError = error.localizedDescription
+            HStack(spacing: 15) {
+                ScoreMiniCircle(score: scoreInt(item), label: "总分")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("上次练习：\(item.timestamp.formatted(.dateTime.month().day().hour().minute()))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(getEncouragement(score: scoreInt(item)))
+                        .font(.caption.bold())
+                        .foregroundStyle(getScoreColor(score: scoreInt(item)))
+                }
             }
+            .padding(16)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
         }
     }
 
     private func scoreInt(_ item: Item) -> Int {
-        // 兼容 Double? / nil
-        let v = item.score ?? 0
-        // 兼容异常值
-        let clamped = min(max(v, 0), 100)
-        return Int(clamped.rounded())
+        Int((item.score ?? 0).rounded())
     }
 
-    private var displayItems: [Item] {
-        Array(items.prefix(3))
+    private func getEncouragement(score: Int) -> String {
+        switch score {
+        case 90...100: return "表现完美，大师级水准！"
+        case 80..<90:  return "进步显著，继续保持！"
+        case 60..<80:  return "基础扎实，再接再厉。"
+        default:       return "只要开口，就是进步。"
+        }
     }
 
-    // 最近记录列表（修复尾部分割线）
-    private var historyPreviewList: some View {
+    private func getScoreColor(score: Int) -> Color {
+        score >= 80 ? .green : (score >= 60 ? .orange : .gray)
+    }
+}
+
+/// 历史列表组件
+struct HistoryPreviewList: View {
+    let items: [Item]
+    let onSeeAll: () -> Void
+
+    var body: some View {
         VStack(spacing: 0) {
-            let list = displayItems
-            ForEach(Array(list.enumerated()), id: \.element.id) { idx, item in
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 HStack {
                     Circle().fill(Color.accentColor).frame(width: 8, height: 8)
                     Text(item.timestamp, format: .dateTime.month().day())
                         .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
                     Text(item.isAudio ? "口语评估" : "文本评估")
                         .font(.subheadline)
                     Spacer()
-                    Text("\(scoreInt(item))")
+                    Text("\(Int((item.score ?? 0).rounded()))")
                         .font(.subheadline.bold())
                         .monospacedDigit()
+                        .foregroundStyle(Color.accentColor)
                 }
                 .padding(.vertical, 12)
 
-                if idx != list.count - 1 {
+                if idx != items.count - 1 {
                     Divider()
                 }
             }
-            Button("查看全部历史") {
-                router.selectedTab = .growth // 跳转到成长/历史
+
+            if items.isEmpty {
+                Text("暂无记录")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding()
+            } else {
+                Button("查看全部历史", action: onSeeAll)
+                    .font(.caption.bold())
+                    .padding(.top, 14)
             }
-            .font(.caption.bold())
-            .padding(.top, 10)
         }
     }
 }

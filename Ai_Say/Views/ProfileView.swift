@@ -192,8 +192,21 @@ struct ProfileView: View {
                 M3SettingRow(icon: "info.circle", title: "关于 Ai_Say", detail: "v1.0.0")
                 Divider().padding(.leading, 44)
                 M3SettingRow(icon: "rectangle.portrait.and.arrow.right", title: "退出登录", color: .red)
+                    .onTapGesture {
+                        logout()
+                    }
             }
         }
+    }
+
+    private func logout() {
+        // 清除登录状态
+        UserDefaults.standard.removeObject(forKey: "accessToken")
+
+        // 重新检查登录状态（这会触发RootView显示登录界面）
+        // 注意：这里需要一种方式通知RootView重新检查登录状态
+        // 暂时使用NotificationCenter
+        NotificationCenter.default.post(name: NSNotification.Name("Logout"), object: nil)
     }
 }
 

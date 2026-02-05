@@ -29,6 +29,15 @@ final class EvalAPIClient: Sendable {
         return decoder
     }()
 
+    // MARK: - 认证拦截器
+    private lazy var authenticator: Authenticator = {
+        Authenticator()
+    }()
+
+    private lazy var interceptor: RequestInterceptor = {
+        Interceptor(adapters: [authenticator])
+    }()
+
     private init() {}
 
     /// 上传音频并评估（简单版本）
@@ -338,7 +347,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params)
+            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -380,7 +389,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params)
+            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -395,8 +404,8 @@ extension EvalAPIClient {
                             return
                         }
                         do {
-                            let list = try Self.decoder.decode([SceneDTO].self, from: resp.data ?? Data())
-                            continuation.resume(returning: list)
+                            let page = try Self.decoder.decode(SpringPage<SceneDTO>.self, from: resp.data ?? Data())
+                            continuation.resume(returning: page.content)
                         } catch {
                             NetworkLogger.logDecodeError(error, rawData: resp.data, context: "fetchScenes")
                             continuation.resume(throwing: EvalAPIError.decodeFailed("Scenes 解析失败：\(error.localizedDescription)\n\(raw)"))
@@ -428,7 +437,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params)
+            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -470,7 +479,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params)
+            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -511,7 +520,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params)
+            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -554,7 +563,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params)
+            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -590,7 +599,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get)
+            AF.request(url, method: .get, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -614,5 +623,17 @@ extension EvalAPIClient {
                     }
                 }
         }
+    }
+}
+
+// MARK: - 认证拦截器
+private class Authenticator: RequestAdapter {
+    func adapt(_ urlRequest: URLRequest, for session: Session, completion: @escaping (Result<URLRequest, Error>) -> Void) {
+        var request = urlRequest
+        // 从 UserDefaults 获取 accessToken
+        if let token = UserDefaults.standard.string(forKey: "accessToken"), !token.isEmpty {
+            request.headers.add(.authorization(bearerToken: token))
+        }
+        completion(.success(request))
     }
 }
