@@ -17,3 +17,20 @@ DerivedData/
 build/
 *.ipa
 *.dSYM
+
+# Sensitive files
+.env
+.env.local
+.env.production
+*.p12
+*.key
+*.pem
+secrets.json
+config.local.json
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

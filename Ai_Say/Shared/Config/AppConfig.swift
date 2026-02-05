@@ -12,9 +12,9 @@ enum AppConfig {
         #endif
     }
 
-    /// 统一BaseURL，所有前端请求都使用2580端口
+    /// 统一BaseURL，所有前端请求都使用2581端口
     static var baseURL: String {
-        "http://\(host):2580"
+        "http://\(host):2581"
     }
 
     /// 网络超时（需要时给 Alamofire Session）

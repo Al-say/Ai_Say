@@ -10,7 +10,7 @@ info:
 servers:
   - url: http://192.168.0.104:8082
     description: 真机/iPad 联调环境
-  - url: http://localhost:8082
+  - url: http://115.191.38.164:2581
     description: iOS 模拟器环境
 
 paths:
