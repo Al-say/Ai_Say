@@ -5,10 +5,10 @@ enum AppConfig {
     /// 真机测试使用 Mac 局域网 IP，模拟器使用 localhost
     static var host: String {
         #if targetEnvironment(simulator)
-        return UserDefaults.standard.string(forKey: "api_host") ?? "115.191.38.164"
+        return UserDefaults.standard.string(forKey: "api_host") ?? "localhost"
         #else
-        // 真机：使用 Mac 局域网 IP
-        return UserDefaults.standard.string(forKey: "api_host") ?? "115.191.38.164"
+        // 真机：使用配置的服务器IP，无默认值以确保安全
+        return UserDefaults.standard.string(forKey: "api_host") ?? "localhost"
         #endif
     }
 

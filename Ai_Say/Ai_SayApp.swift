@@ -10,6 +10,8 @@ import SwiftData
 
 @main
 struct Ai_SayApp: App {
+    @StateObject private var loginViewModel = LoginViewModel()
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -25,7 +27,8 @@ struct Ai_SayApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environmentObject(loginViewModel)
         }
         .modelContainer(sharedModelContainer)
     }

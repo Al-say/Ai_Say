@@ -46,9 +46,9 @@
 
 ## 🌐 服务器配置
 - **本地开发**: http://localhost:2581
-- **生产环境**: http://115.191.38.164:2581
+- **生产环境**: https://your-api-domain.com (请配置环境变量)
 
-所有接口都支持CORS跨域请求，并包含完整的错误处理和响应格式化。
+**安全提醒**: 请勿在公开文档中暴露真实的服务器IP地址和端口信息。
 
 ---
 
@@ -60,17 +60,26 @@
 
 所有前端请求统一使用 **2581端口**：
 
-- **模拟器调试**：设置 `UserDefaults` 的 `api_host` 为 `"115.191.38.164"`
+- **模拟器调试**：设置 `UserDefaults` 的 `api_host` 为你的服务器IP
   ```swift
-  UserDefaults.standard.set("115.191.38.164", forKey: "api_host")
+  UserDefaults.standard.set("YOUR_SERVER_IP", forKey: "api_host")
   ```
 - **真机调试**：设置 `UserDefaults` 的 `api_host` 为服务器IP
   ```swift
-  UserDefaults.standard.set("115.191.38.164", forKey: "api_host")  // 生产服务器IP
+  UserDefaults.standard.set("YOUR_SERVER_IP", forKey: "api_host")  // 生产服务器IP
   ```
   确保设备与服务器网络连通。
 
-**重要**：后端已部署到生产服务器 `115.191.38.164:2581`！
+**重要**：请在本地配置文件或环境变量中配置真实的服务器地址，不要在代码中硬编码！
+
+### 环境变量配置
+
+创建 `.env` 文件（已加入 .gitignore，不会上传到Git）：
+
+```env
+API_HOST=your-server-ip
+API_PORT=2581
+```
 
 ### 支持的API端点
 
@@ -92,9 +101,9 @@
 
 ## 2. 接口定义
 
-* **URL**：`http://115.191.38.164:2581/api/eval/text`
+* **URL**：`https://your-api-domain.com/api/eval/text`
 
-  * **生产环境**：使用服务器IP `http://115.191.38.164:2581`
+  * **生产环境**：使用配置的服务器地址
 * **Method**：`POST`
 * **Content-Type**：`application/json`
 
@@ -213,8 +222,8 @@ final class APIManager: ObservableObject {
     static let shared = APIManager()
     private init() {}
 
-    // 生产环境：服务器IP
-    private let baseURL = "http://115.191.38.164:2581"
+    // 生产环境：从配置读取
+    private let baseURL = "https://your-api-domain.com"
 
     @Published var isLoading = false
     @Published var serverMessage = "准备就绪"
@@ -265,7 +274,7 @@ final class APIManager: ObservableObject {
 
 ## 6. 联调自检（iOS 侧）
 
-* 模拟器/真机：`http://115.191.38.164:2581` 可直接访问
-* Safari 先打开 `http://115.191.38.164:2581/api/test` 验证网络可达，再跑 App
+* 模拟器/真机：`https://your-api-domain.com` 可直接访问
+* Safari 先打开 `https://your-api-domain.com/api/test` 验证网络可达，再跑 App
 
 ---
