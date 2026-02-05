@@ -690,7 +690,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
+            AF.request(url, method: .get, parameters: params)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
