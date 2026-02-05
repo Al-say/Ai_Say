@@ -15,11 +15,21 @@ enum Endpoints {
     static let evalAudio     = "/api/eval/audio"
     static let evalAudioFull = "/api/eval/audio/full"  // 完整音频评估（推荐）
     static let evalText      = "/api/eval/text"
+    static let evaluate      = "/api/v1/evaluate"      // 新评估接口
+    static let evaluateTask  = "/api/v1/evaluate"      // + "/{taskId}"
+    static let evaluateHistory = "/api/v1/evaluate/history"
+
+    // 认证模块
+    static let authApple     = "/api/auth/apple"
+    static let authMe        = "/api/auth/me"
+    static let authBindDevice = "/api/auth/bind-device"
+    static let authRegister  = "/api/auth/register"
+    static let authLogin     = "/api/auth/login"
 
     // 成长模块
     static let growthHistory  = "/api/growth/history"
-    static let growthAnalysis = "/api/growth/analysis"
-    static let growthDetail   = "/api/growth/detail" // + "/{id}"
+    static let growthStats    = "/api/growth/stats"
+    static let growthDetail   = "/api/growth" // + "/{recordId}"
 
     // 首页模块
     static let homeDaily      = "/api/home/daily"     // ✅ 修正路径

@@ -202,6 +202,7 @@ struct ProfileView: View {
     private func logout() {
         // 清除登录状态
         UserDefaults.standard.removeObject(forKey: "accessToken")
+        UserDefaults.standard.removeObject(forKey: "loginMode")
 
         // 重新检查登录状态（这会触发RootView显示登录界面）
         // 注意：这里需要一种方式通知RootView重新检查登录状态

@@ -26,7 +26,6 @@ final class GrowthViewModel: ObservableObject {
 
     // 🆕 云端数据状态
     @Published private(set) var historyRecords: [GrowthHistoryItem] = []
-    @Published private(set) var analysisData: GrowthAnalysisDTO?
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var errorMessage: String?
 
@@ -41,14 +40,10 @@ final class GrowthViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            // 并行请求历史列表和雷达图分析
-            async let historyTask = client.fetchGrowthHistory(persona: persona, limit: 50)
-            async let analysisTask = client.fetchGrowthAnalysis(persona: persona)
-
-            let (history, analysis) = try await (historyTask, analysisTask)
+            // 请求历史列表
+            let history = try await client.fetchGrowthHistory(persona: persona, limit: 50)
 
             historyRecords = history
-            analysisData = analysis
 
             // 🆕 从云端数据构建图表
             rebuildFromCloudData()
@@ -79,17 +74,10 @@ final class GrowthViewModel: ObservableObject {
             )
         }.reversed()
 
-        // 构建雷达图维度
-        if let analysis = analysisData {
-            radarDims = [
-                RadarDimension(key: "fluency", title: "流利度", value: analysis.fluency),
-                RadarDimension(key: "completeness", title: "完整度", value: analysis.completeness),
-                RadarDimension(key: "relevance", title: "相关性", value: analysis.relevance)
-            ]
-            summaryText = "共 \(analysis.count) 次练习 · 近 \(analysis.days) 天"
-        } else if !historyRecords.isEmpty {
-            // 如果没有分析数据，从历史记录计算
-            let recent = Array(historyRecords.prefix(5))
+        // 构建雷达图维度 - 总是从历史记录计算
+        if !historyRecords.isEmpty {
+            // 从历史记录计算平均值
+            let recent = Array(historyRecords.prefix(20)) // 使用更多记录计算平均值
             let avgFluency = recent.compactMap(\.fluency).reduce(0, +) / Double(max(recent.compactMap(\.fluency).count, 1))
             let avgCompleteness = recent.compactMap(\.completeness).reduce(0, +) / Double(max(recent.compactMap(\.completeness).count, 1))
             let avgRelevance = recent.compactMap(\.relevance).reduce(0, +) / Double(max(recent.compactMap(\.relevance).count, 1))

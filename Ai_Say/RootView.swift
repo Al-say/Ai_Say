@@ -27,8 +27,8 @@ struct RootView: View {
             loginViewModel.checkLoginStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("Logout"))) { _ in
-            // 收到退出登录通知，重新检查登录状态
-            loginViewModel.checkLoginStatus()
+            // 收到退出登录通知
+            loginViewModel.logout()
         }
     }
 }

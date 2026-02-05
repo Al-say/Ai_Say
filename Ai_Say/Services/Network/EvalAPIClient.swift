@@ -334,6 +334,175 @@ final class EvalAPIClient: Sendable {
 // MARK: - GET 接口
 extension EvalAPIClient {
 
+    /// 用户名/邮箱登录
+    /// POST /api/auth/login
+    func loginWithUsername(
+        usernameOrEmail: String,
+        password: String
+    ) async throws -> [String: Any] {
+        let url = "\(baseURL)\(Endpoints.authLogin)"
+        let body: [String: Any] = [
+            "username": usernameOrEmail,
+            "password": password
+        ]
+
+        // 📤 请求日志
+        NetworkLogger.logRequest(method: "POST", url: url, body: nil, params: ["body": body])
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let startTime = Date()
+            AF.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
+                .responseData { resp in
+                    let duration = Date().timeIntervalSince(startTime)
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+                    // 📥 响应日志
+                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
+
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            if let json = try JSONSerialization.jsonObject(with: resp.data ?? Data()) as? [String: Any] {
+                                continuation.resume(returning: json)
+                            } else {
+                                continuation.resume(throwing: EvalAPIError.decodeFailed("无效的JSON响应"))
+                            }
+                        } catch {
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("JSON解析失败：\(error.localizedDescription)"))
+                        }
+                    }
+                }
+        }
+    }
+
+    /// 用户注册
+    /// POST /api/auth/register
+    func registerUser(
+        username: String,
+        email: String,
+        password: String
+    ) async throws -> [String: Any] {
+        let url = "\(baseURL)\(Endpoints.authRegister)"
+        let body: [String: Any] = [
+            "username": username,
+            "email": email,
+            "password": password
+        ]
+
+        // 📤 请求日志
+        NetworkLogger.logRequest(method: "POST", url: url, body: nil, params: ["body": body])
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let startTime = Date()
+            AF.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
+                .responseData { resp in
+                    let duration = Date().timeIntervalSince(startTime)
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+                    // 📥 响应日志
+                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
+
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            if let json = try JSONSerialization.jsonObject(with: resp.data ?? Data()) as? [String: Any] {
+                                continuation.resume(returning: json)
+                            } else {
+                                continuation.resume(throwing: EvalAPIError.decodeFailed("无效的JSON响应"))
+                            }
+                        } catch {
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("JSON解析失败：\(error.localizedDescription)"))
+                        }
+                    }
+                }
+        }
+    }
+
+    /// 获取当前用户信息
+    /// GET /api/auth/me
+    func fetchCurrentUser() async throws -> [String: Any] {
+        let url = "\(baseURL)\(Endpoints.authMe)"
+
+        // 📤 请求日志
+        NetworkLogger.logRequest(method: "GET", url: url)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let startTime = Date()
+            AF.request(url, method: .get, interceptor: interceptor)
+                .responseData { resp in
+                    let duration = Date().timeIntervalSince(startTime)
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+                    // 📥 响应日志
+                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
+
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            if let json = try JSONSerialization.jsonObject(with: resp.data ?? Data()) as? [String: Any] {
+                                continuation.resume(returning: json)
+                            } else {
+                                continuation.resume(throwing: EvalAPIError.decodeFailed("无效的JSON响应"))
+                            }
+                        } catch {
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("JSON解析失败：\(error.localizedDescription)"))
+                        }
+                    }
+                }
+        }
+    }
+
+    /// 绑定设备ID
+    /// POST /api/auth/bind-device
+    func bindDevice(deviceId: String) async throws -> [String: Any] {
+        let url = "\(baseURL)\(Endpoints.authBindDevice)"
+        let body: [String: Any] = ["deviceId": deviceId]
+
+        // 📤 请求日志
+        NetworkLogger.logRequest(method: "POST", url: url, body: nil, params: ["body": body])
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let startTime = Date()
+            AF.request(url, method: .post, parameters: body, encoding: JSONEncoding.default, interceptor: interceptor)
+                .responseData { resp in
+                    let duration = Date().timeIntervalSince(startTime)
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+                    // 📥 响应日志
+                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
+
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            if let json = try JSONSerialization.jsonObject(with: resp.data ?? Data()) as? [String: Any] {
+                                continuation.resume(returning: json)
+                            } else {
+                                continuation.resume(throwing: EvalAPIError.decodeFailed("无效的JSON响应"))
+                            }
+                        } catch {
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("JSON解析失败：\(error.localizedDescription)"))
+                        }
+                    }
+                }
+        }
+    }
+
     /// 获取今日挑战
     /// GET /api/home/daily?persona=XXX
     func fetchDailyChallenge(
@@ -463,48 +632,6 @@ extension EvalAPIClient {
         }
     }
 
-    /// 获取雷达图分析 (90天)
-    /// GET /api/growth/analysis?deviceId=XXX&persona=YYY
-    func fetchGrowthAnalysis(
-        persona: UserPersona
-    ) async throws -> GrowthAnalysisDTO {
-        let url = "\(baseURL)\(Endpoints.growthAnalysis)"
-        let params: [String: String] = [
-            "deviceId": DeviceIdManager.shared.deviceId,
-            "persona": persona.rawValue
-        ]
-
-        // 📤 请求日志
-        NetworkLogger.logRequest(method: "GET", url: url, params: params)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let startTime = Date()
-            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
-                .responseData { resp in
-                    let duration = Date().timeIntervalSince(startTime)
-                    let code = resp.response?.statusCode ?? 0
-                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
-
-                    // 📥 响应日志
-                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
-
-                    Task { @MainActor in
-                        guard (200..<300).contains(code) else {
-                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
-                            return
-                        }
-                        do {
-                            let dto = try Self.decoder.decode(GrowthAnalysisDTO.self, from: resp.data ?? Data())
-                            continuation.resume(returning: dto)
-                        } catch {
-                            NetworkLogger.logDecodeError(error, rawData: resp.data, context: "fetchGrowthAnalysis")
-                            continuation.resume(throwing: EvalAPIError.decodeFailed("GrowthAnalysis 解析失败：\(error.localizedDescription)\n\(raw)"))
-                        }
-                    }
-                }
-        }
-    }
-
     /// 获取单条评估详情
     /// GET /api/growth/detail/{id}?deviceId=XXX
     func fetchGrowthDetail(
@@ -619,6 +746,118 @@ extension EvalAPIClient {
                         } catch {
                             NetworkLogger.logDecodeError(error, rawData: resp.data, context: "fetchProfile")
                             continuation.resume(throwing: EvalAPIError.decodeFailed("Profile 解析失败：\(error.localizedDescription)\n\(raw)"))
+                        }
+                    }
+                }
+        }
+    }
+
+    /// 获取评估历史记录
+    /// GET /api/v1/evaluate/history?page=0&size=20
+    func fetchEvaluationHistory(
+        page: Int = 0,
+        size: Int = 20
+    ) async throws -> SpringPage<EvaluationRecordDTO> {
+        let url = "\(baseURL)\(Endpoints.evaluateHistory)"
+        let params = ["page": "\(page)", "size": "\(size)"]
+
+        // 📤 请求日志
+        NetworkLogger.logRequest(method: "GET", url: url, params: params)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let startTime = Date()
+            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
+                .responseData { resp in
+                    let duration = Date().timeIntervalSince(startTime)
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+                    // 📥 响应日志
+                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
+
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            let page = try Self.decoder.decode(SpringPage<EvaluationRecordDTO>.self, from: resp.data ?? Data())
+                            continuation.resume(returning: page)
+                        } catch {
+                            NetworkLogger.logDecodeError(error, rawData: resp.data, context: "fetchEvaluationHistory")
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("EvaluationHistory 解析失败：\(error.localizedDescription)\n\(raw)"))
+                        }
+                    }
+                }
+        }
+    }
+
+    /// 获取成长统计数据
+    /// GET /api/growth/stats
+    func fetchGrowthStats() async throws -> GrowthStatsDTO {
+        let url = "\(baseURL)\(Endpoints.growthStats)"
+
+        // 📤 请求日志
+        NetworkLogger.logRequest(method: "GET", url: url)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let startTime = Date()
+            AF.request(url, method: .get, interceptor: interceptor)
+                .responseData { resp in
+                    let duration = Date().timeIntervalSince(startTime)
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+                    // 📥 响应日志
+                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
+
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            let stats = try Self.decoder.decode(GrowthStatsDTO.self, from: resp.data ?? Data())
+                            continuation.resume(returning: stats)
+                        } catch {
+                            NetworkLogger.logDecodeError(error, rawData: resp.data, context: "fetchGrowthStats")
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("GrowthStats 解析失败：\(error.localizedDescription)\n\(raw)"))
+                        }
+                    }
+                }
+        }
+    }
+
+    /// 获取单次评估详情
+    /// GET /api/growth/{recordId}
+    func fetchEvaluationDetail(recordId: String) async throws -> EvaluationDetailDTO {
+        let url = "\(baseURL)\(Endpoints.growthDetail)/\(recordId)"
+
+        // 📤 请求日志
+        NetworkLogger.logRequest(method: "GET", url: url)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let startTime = Date()
+            AF.request(url, method: .get, interceptor: interceptor)
+                .responseData { resp in
+                    let duration = Date().timeIntervalSince(startTime)
+                    let code = resp.response?.statusCode ?? 0
+                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
+
+                    // 📥 响应日志
+                    NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
+
+                    Task { @MainActor in
+                        guard (200..<300).contains(code) else {
+                            continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                            return
+                        }
+                        do {
+                            let detail = try Self.decoder.decode(EvaluationDetailDTO.self, from: resp.data ?? Data())
+                            continuation.resume(returning: detail)
+                        } catch {
+                            NetworkLogger.logDecodeError(error, rawData: resp.data, context: "fetchEvaluationDetail")
+                            continuation.resume(throwing: EvalAPIError.decodeFailed("EvaluationDetail 解析失败：\(error.localizedDescription)\n\(raw)"))
                         }
                     }
                 }

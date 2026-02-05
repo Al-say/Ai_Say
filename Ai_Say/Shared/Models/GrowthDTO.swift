@@ -58,6 +58,67 @@ struct GrowthDetailDTO: Decodable, Sendable {
     let createdAt: String
 }
 
+/// 评估记录 DTO (用于历史记录)
+/// GET /api/v1/evaluate/history
+struct EvaluationRecordDTO: Decodable, Identifiable, Sendable {
+    let id: String
+    let taskId: String?
+    let transcript: String?
+    let persona: String?
+    let scene: String?
+    let status: String?
+    let score: Double?
+    let fluency: Double?
+    let completeness: Double?
+    let relevance: Double?
+    let issues: [Issue]?
+    let suggestions: [String]?
+    let audioUrl: String?
+    let createdAt: String?
+    let completedAt: String?
+}
+
+/// 评估详情 DTO
+/// GET /api/growth/{recordId}
+struct EvaluationDetailDTO: Decodable, Sendable {
+    let id: String
+    let taskId: String?
+    let transcript: String?
+    let persona: String?
+    let scene: String?
+    let status: String?
+    let score: Double?
+    let fluency: Double?
+    let completeness: Double?
+    let relevance: Double?
+    let issues: [Issue]?
+    let suggestions: [String]?
+    let audioUrl: String?
+    let createdAt: String?
+    let completedAt: String?
+    let feedback: String?
+}
+
+/// 成长统计 DTO
+/// GET /api/growth/stats
+struct GrowthStatsDTO: Decodable, Sendable {
+    let totalEvaluations: Int?
+    let averageScore: Double?
+    let totalPracticeTime: Int?  // 分钟
+    let currentStreak: Int?
+    let bestStreak: Int?
+    let lastEvaluationDate: String?
+    let improvementRate: Double?  // 百分比
+    
+    // 辅助属性
+    var evaluations: Int { totalEvaluations ?? 0 }
+    var score: Double { averageScore ?? 0.0 }
+    var practiceTime: Int { totalPracticeTime ?? 0 }
+    var streak: Int { currentStreak ?? 0 }
+    var best: Int { bestStreak ?? 0 }
+    var improvement: Double { improvementRate ?? 0.0 }
+}
+
 // MARK: - Profile API 响应模型
 
 /// 用户统计数据
