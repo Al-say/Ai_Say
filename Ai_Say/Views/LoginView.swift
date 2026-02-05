@@ -38,14 +38,82 @@ struct LoginView: View {
 
                 // 登录按钮
                 VStack(spacing: 20) {
-                    SignInWithAppleButton(.signIn) { request in
-                        viewModel.handleSignInWithAppleRequest(request)
-                    } onCompletion: { result in
-                        viewModel.handleSignInWithAppleCompletion(result)
+                    if viewModel.isRegisterMode {
+                        // 注册模式
+                        VStack(spacing: 15) {
+                            TextField("用户名", text: $viewModel.registerUsername)
+                                .textFieldStyle(.roundedBorder)
+                                .autocapitalization(.none)
+                            
+                            TextField("邮箱", text: $viewModel.registerEmail)
+                                .textFieldStyle(.roundedBorder)
+                                .keyboardType(.emailAddress)
+                                .autocapitalization(.none)
+                            
+                            SecureField("密码", text: $viewModel.password)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            SecureField("确认密码", text: $viewModel.confirmPassword)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            Button("注册") {
+                                Task { await viewModel.register() }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .frame(maxWidth: .infinity)
+                            
+                            Button("已有账号？去登录") {
+                                viewModel.isRegisterMode = false
+                            }
+                            .foregroundColor(.blue)
+                        }
+                        .padding(.horizontal, 40)
+                    } else {
+                        // 登录模式
+                        VStack(spacing: 15) {
+                            TextField("用户名或邮箱", text: $viewModel.usernameOrEmail)
+                                .textFieldStyle(.roundedBorder)
+                                .autocapitalization(.none)
+                            
+                            SecureField("密码", text: $viewModel.password)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            Button("登录") {
+                                Task { await viewModel.loginWithCredentials() }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .frame(maxWidth: .infinity)
+                            
+                            Button("没有账号？去注册") {
+                                viewModel.isRegisterMode = true
+                            }
+                            .foregroundColor(.blue)
+                        }
+                        .padding(.horizontal, 40)
+                        
+                        // 分隔线
+                        HStack {
+                            Rectangle()
+                                .frame(height: 1)
+                                .foregroundColor(.gray.opacity(0.5))
+                            Text("或")
+                                .foregroundColor(.gray)
+                            Rectangle()
+                                .frame(height: 1)
+                                .foregroundColor(.gray.opacity(0.5))
+                        }
+                        .padding(.horizontal, 40)
+                        
+                        // Apple登录
+                        SignInWithAppleButton(.signIn) { request in
+                            viewModel.handleSignInWithAppleRequest(request)
+                        } onCompletion: { result in
+                            viewModel.handleSignInWithAppleCompletion(result)
+                        }
+                        .signInWithAppleButtonStyle(.whiteOutline)
+                        .frame(height: 50)
+                        .padding(.horizontal, 40)
                     }
-                    .signInWithAppleButtonStyle(.whiteOutline)
-                    .frame(height: 50)
-                    .padding(.horizontal, 40)
 
                     Text("继续即表示您同意我们的服务条款")
                         .font(.caption)
