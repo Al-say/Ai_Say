@@ -75,112 +75,57 @@ final class EvalAPIClient: Sendable {
     ) async throws -> (resp: TextEvalResp, rawJSON: String) {
 
         let urlString = "\(baseURL)/api/eval/audio"
-        guard let url = URL(string: urlString) else {
-            throw EvalAPIError.invalidURL
-        }
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = timeout
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        let body = try makeMultipartBody(
-            boundary: boundary,
-            fileURL: fileURL,
-            fileFieldName: "file",
-            fileName: "upload.m4a",
-            mimeType: "audio/x-m4a",
-            prompt: prompt,
-            persona: persona
-        )
-
-        request.httpBody = body
-        request.setValue("\(body.count)", forHTTPHeaderField: "Content-Length")
-
-        // ✅ 注入 JWT Token（URLSession 不走 Alamofire 拦截器，需手动添加）
-        if let token = UserDefaults.standard.string(forKey: "accessToken"), !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
 
         // 📤 请求日志
         NetworkLogger.logRequest(
             method: "POST",
             url: urlString,
             headers: ["Content-Type": "multipart/form-data"],
-            body: nil,  // 不打印二进制文件
+            body: nil,
             params: ["prompt": prompt ?? "", "persona": persona.rawValue]
         )
 
         let startTime = Date()
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let duration = Date().timeIntervalSince(startTime)
 
-        let raw = String(data: data, encoding: .utf8) ?? "<non-utf8 body>"
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return try await withCheckedThrowingContinuation { continuation in
+            Self.afSession.upload(
+                multipartFormData: { form in
+                    form.append(fileURL, withName: "file", fileName: "upload.m4a", mimeType: "audio/x-m4a")
+                    if let prompt, !prompt.isEmpty {
+                        form.append(prompt.data(using: .utf8)!, withName: "prompt")
+                    }
+                    form.append(persona.rawValue.data(using: .utf8)!, withName: "persona")
+                },
+                to: urlString,
+                interceptor: interceptor
+            )
+            .responseData { resp in
+                let duration = Date().timeIntervalSince(startTime)
+                let code = resp.response?.statusCode ?? 0
+                let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<non-utf8 body>"
 
-        // 📥 响应日志
-        NetworkLogger.logResponse(url: urlString, statusCode: status, data: data, duration: duration)
+                NetworkLogger.logResponse(url: urlString, statusCode: code, data: resp.data, duration: duration)
 
-        guard (200..<300).contains(status) else {
-            throw EvalAPIError.badStatus(status, raw)
-        }
-
-        do {
-            let decoded = try Self.decoder.decode(TextEvalResp.self, from: data)
-            return (decoded, raw)
-        } catch {
-            NetworkLogger.logDecodeError(error, rawData: data, context: "uploadAudio")
-            throw EvalAPIError.decodeFailed("\(error)\nRaw: \(raw)")
+                Task { @MainActor in
+                    guard (200..<300).contains(code) else {
+                        continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                        return
+                    }
+                    do {
+                        let decoded = try Self.decoder.decode(TextEvalResp.self, from: resp.data ?? Data())
+                        continuation.resume(returning: (decoded, raw))
+                    } catch {
+                        NetworkLogger.logDecodeError(error, rawData: resp.data, context: "uploadAudio")
+                        continuation.resume(throwing: EvalAPIError.decodeFailed("\(error)\nRaw: \(raw)"))
+                    }
+                }
+            }
         }
     }
 
     func fullAudioURL(from audioUrl: String) -> URL? {
         if audioUrl.hasPrefix("http") { return URL(string: audioUrl) }
         return URL(string: "\(baseURL)\(audioUrl)")
-    }
-
-    private func makeMultipartBody(
-        boundary: String,
-        fileURL: URL,
-        fileFieldName: String,
-        fileName: String,
-        mimeType: String,
-        prompt: String?,
-        persona: UserPersona
-    ) throws -> Data {
-        var data = Data()
-
-        func appendLine(_ s: String) {
-            data.append(s.data(using: .utf8)!)
-            data.append("\r\n".data(using: .utf8)!)
-        }
-
-        // 1) file
-        let fileData = try Data(contentsOf: fileURL)
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"\(fileFieldName)\"; filename=\"\(fileName)\"")
-        appendLine("Content-Type: \(mimeType)")
-        appendLine("")
-        data.append(fileData)
-        appendLine("")
-
-        // 2) prompt（可选）
-        if let prompt, !prompt.isEmpty {
-            appendLine("--\(boundary)")
-            appendLine("Content-Disposition: form-data; name=\"prompt\"")
-            appendLine("")
-            appendLine(prompt)
-        }
-
-        // 3) persona
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"persona\"")
-        appendLine("")
-        appendLine(persona.rawValue)
-
-        appendLine("--\(boundary)--")
-        return data
     }
 
     /// 构造完整的 URL
@@ -198,11 +143,7 @@ final class EvalAPIClient: Sendable {
     ) async throws -> (resp: TextEvalResp, rawJSON: String) {
 
         let urlString = "\(baseURL)/api/eval/text?persona=\(persona.rawValue)"
-        guard let url = URL(string: urlString) else {
-            throw EvalAPIError.invalidURL
-        }
 
-        // ✅ Body 包含 deviceId
         let req = TextEvalReq(
             deviceId: DeviceIdManager.shared.deviceId,
             prompt: prompt,
@@ -210,42 +151,41 @@ final class EvalAPIClient: Sendable {
             expectedKeywords: nil,
             referenceAnswer: nil
         )
-        let bodyData = try JSONEncoder().encode(req)
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = timeout
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = bodyData
 
         // 📤 请求日志
-        NetworkLogger.logRequest(
-            method: "POST",
-            url: urlString,
-            headers: ["Content-Type": "application/json"],
-            body: bodyData
-        )
+        NetworkLogger.logRequest(method: "POST", url: urlString, headers: ["Content-Type": "application/json"])
 
         let startTime = Date()
-        let (responseData, response) = try await URLSession.shared.data(for: request)
-        let duration = Date().timeIntervalSince(startTime)
 
-        let raw = String(data: responseData, encoding: .utf8) ?? "<non-utf8 body>"
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return try await withCheckedThrowingContinuation { continuation in
+            Self.afSession.request(
+                urlString,
+                method: .post,
+                parameters: req,
+                encoder: JSONParameterEncoder.default,
+                interceptor: interceptor
+            )
+            .responseData { resp in
+                let duration = Date().timeIntervalSince(startTime)
+                let code = resp.response?.statusCode ?? 0
+                let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<non-utf8 body>"
 
-        // 📥 响应日志
-        NetworkLogger.logResponse(url: urlString, statusCode: status, data: responseData, duration: duration)
+                NetworkLogger.logResponse(url: urlString, statusCode: code, data: resp.data, duration: duration)
 
-        guard (200..<300).contains(status) else {
-            throw EvalAPIError.badStatus(status, raw)
-        }
-
-        do {
-            let decoded = try Self.decoder.decode(TextEvalResp.self, from: responseData)
-            return (decoded, raw)
-        } catch {
-            NetworkLogger.logDecodeError(error, rawData: responseData, context: "evalText")
-            throw EvalAPIError.decodeFailed("\(error)\nRaw: \(raw)")
+                Task { @MainActor in
+                    guard (200..<300).contains(code) else {
+                        continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                        return
+                    }
+                    do {
+                        let decoded = try Self.decoder.decode(TextEvalResp.self, from: resp.data ?? Data())
+                        continuation.resume(returning: (decoded, raw))
+                    } catch {
+                        NetworkLogger.logDecodeError(error, rawData: resp.data, context: "evalText")
+                        continuation.resume(throwing: EvalAPIError.decodeFailed("\(error)\nRaw: \(raw)"))
+                    }
+                }
+            }
         }
     }
 
@@ -260,30 +200,6 @@ final class EvalAPIClient: Sendable {
     ) async throws -> (resp: TextEvalResp, rawJSON: String) {
 
         let urlString = "\(baseURL)\(Endpoints.evalAudioFull)"
-        guard let url = URL(string: urlString) else {
-            throw EvalAPIError.invalidURL
-        }
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = timeout
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        let body = try makeFullAudioMultipartBody(
-            boundary: boundary,
-            fileURL: fileURL,
-            scene: scene,
-            persona: persona
-        )
-
-        request.httpBody = body
-        request.setValue("\(body.count)", forHTTPHeaderField: "Content-Length")
-
-        // ✅ 注入 JWT Token（URLSession 不走 Alamofire 拦截器，需手动添加）
-        if let token = UserDefaults.standard.string(forKey: "accessToken"), !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
 
         // 📤 请求日志
         NetworkLogger.logRequest(
@@ -299,71 +215,43 @@ final class EvalAPIClient: Sendable {
         )
 
         let startTime = Date()
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let duration = Date().timeIntervalSince(startTime)
 
-        let raw = String(data: data, encoding: .utf8) ?? "<non-utf8 body>"
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        // ✅ 使用 Alamofire 原生 multipart upload，自动处理 boundary/CRLF/Content-Type
+        //    通过 interceptor 自动注入 JWT Authorization header
+        return try await withCheckedThrowingContinuation { continuation in
+            Self.afSession.upload(
+                multipartFormData: { form in
+                    form.append(DeviceIdManager.shared.deviceId.data(using: .utf8)!, withName: "deviceId")
+                    form.append(persona.rawValue.data(using: .utf8)!, withName: "persona")
+                    form.append(scene.data(using: .utf8)!, withName: "scene")
+                    // ✅ 直接用 fileURL append，Alamofire 负责读取二进制数据
+                    form.append(fileURL, withName: "audio", fileName: fileURL.lastPathComponent, mimeType: "audio/x-m4a")
+                },
+                to: urlString,
+                interceptor: interceptor
+            )
+            .responseData { resp in
+                let duration = Date().timeIntervalSince(startTime)
+                let code = resp.response?.statusCode ?? 0
+                let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<non-utf8 body>"
 
-        // 📥 响应日志
-        NetworkLogger.logResponse(url: urlString, statusCode: status, data: data, duration: duration)
+                NetworkLogger.logResponse(url: urlString, statusCode: code, data: resp.data, duration: duration)
 
-        guard (200..<300).contains(status) else {
-            throw EvalAPIError.badStatus(status, raw)
+                Task { @MainActor in
+                    guard (200..<300).contains(code) else {
+                        continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
+                        return
+                    }
+                    do {
+                        let decoded = try Self.decoder.decode(TextEvalResp.self, from: resp.data ?? Data())
+                        continuation.resume(returning: (decoded, raw))
+                    } catch {
+                        NetworkLogger.logDecodeError(error, rawData: resp.data, context: "uploadFullAudio")
+                        continuation.resume(throwing: EvalAPIError.decodeFailed("\(error)\nRaw: \(raw)"))
+                    }
+                }
+            }
         }
-
-        do {
-            let decoded = try Self.decoder.decode(TextEvalResp.self, from: data)
-            return (decoded, raw)
-        } catch {
-            NetworkLogger.logDecodeError(error, rawData: data, context: "uploadFullAudio")
-            throw EvalAPIError.decodeFailed("\(error)\nRaw: \(raw)")
-        }
-    }
-
-    /// 构建完整音频评估的 Multipart Body
-    private func makeFullAudioMultipartBody(
-        boundary: String,
-        fileURL: URL,
-        scene: String,
-        persona: UserPersona
-    ) throws -> Data {
-        var data = Data()
-
-        func appendLine(_ s: String) {
-            data.append(s.data(using: .utf8)!)
-            data.append("\r\n".data(using: .utf8)!)
-        }
-
-        // 1) deviceId
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"deviceId\"")
-        appendLine("")
-        appendLine(DeviceIdManager.shared.deviceId)
-
-        // 2) persona
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"persona\"")
-        appendLine("")
-        appendLine(persona.rawValue)
-
-        // 3) scene
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"scene\"")
-        appendLine("")
-        appendLine(scene)
-
-        // 4) audio file
-        let fileData = try Data(contentsOf: fileURL)
-        appendLine("--\(boundary)")
-        appendLine("Content-Disposition: form-data; name=\"audio\"; filename=\"recording.m4a\"")
-        appendLine("Content-Type: audio/x-m4a")
-        appendLine("")
-        data.append(fileData)
-        appendLine("")
-
-        appendLine("--\(boundary)--")
-        return data
     }
 }
 
