@@ -138,7 +138,7 @@ class LoginViewModel: ObservableObject {
             // 绑定设备（在主线程外执行异步操作）
             if let accessToken = token["accessToken"] as? String {
                 do {
-                    _ = try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
+                    try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
                     print("✅ 设备绑定成功")
                 } catch {
                     print("⚠️ 设备绑定失败: \(error.localizedDescription)")
@@ -211,7 +211,7 @@ class LoginViewModel: ObservableObject {
                     // 绑定设备
                     Task {
                         do {
-                            _ = try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
+                            try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
                             print("✅ 注册设备绑定成功")
                         } catch {
                             print("⚠️ 注册设备绑定失败: \(error.localizedDescription)")
@@ -304,7 +304,7 @@ class LoginViewModel: ObservableObject {
                     // 绑定设备
                     Task {
                         do {
-                            _ = try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
+                            try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
                             print("✅ Apple登录设备绑定成功")
                         } catch {
                             print("⚠️ Apple登录设备绑定失败: \(error.localizedDescription)")

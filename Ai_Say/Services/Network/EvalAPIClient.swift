@@ -98,6 +98,11 @@ final class EvalAPIClient: Sendable {
         request.httpBody = body
         request.setValue("\(body.count)", forHTTPHeaderField: "Content-Length")
 
+        // ✅ 注入 JWT Token（URLSession 不走 Alamofire 拦截器，需手动添加）
+        if let token = UserDefaults.standard.string(forKey: "accessToken"), !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
         // 📤 请求日志
         NetworkLogger.logRequest(
             method: "POST",
@@ -274,6 +279,11 @@ final class EvalAPIClient: Sendable {
 
         request.httpBody = body
         request.setValue("\(body.count)", forHTTPHeaderField: "Content-Length")
+
+        // ✅ 注入 JWT Token（URLSession 不走 Alamofire 拦截器，需手动添加）
+        if let token = UserDefaults.standard.string(forKey: "accessToken"), !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         // 📤 请求日志
         NetworkLogger.logRequest(
@@ -491,8 +501,8 @@ extension EvalAPIClient {
     }
 
     /// 绑定设备ID
-    /// POST /api/auth/bind-device
-    func bindDevice(deviceId: String) async throws -> [String: Any] {
+    /// POST /api/auth/bind-device（后端返回空 Body，仅校验 2xx 状态码）
+    func bindDevice(deviceId: String) async throws {
         let url = "\(baseURL)\(Endpoints.authBindDevice)"
         let body: [String: Any] = ["deviceId": deviceId]
 
@@ -502,27 +512,22 @@ extension EvalAPIClient {
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
             Self.afSession.request(url, method: .post, parameters: body, encoding: JSONEncoding.default, interceptor: interceptor)
-                .responseData { resp in
+                .validate(statusCode: 200..<300)
+                .response { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
-                    let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
 
                     // 📥 响应日志
                     NetworkLogger.logResponse(url: url, statusCode: code, data: resp.data, duration: duration)
 
                     Task { @MainActor in
-                        guard (200..<300).contains(code) else {
+                        switch resp.result {
+                        case .success:
+                            print("✅ 设备绑定成功")
+                            continuation.resume()
+                        case .failure(let error):
+                            let raw = String(data: resp.data ?? Data(), encoding: .utf8) ?? "<empty>"
                             continuation.resume(throwing: EvalAPIError.badStatus(code, raw))
-                            return
-                        }
-                        do {
-                            if let json = try JSONSerialization.jsonObject(with: resp.data ?? Data()) as? [String: Any] {
-                                continuation.resume(returning: json)
-                            } else {
-                                continuation.resume(throwing: EvalAPIError.decodeFailed("无效的JSON响应"))
-                            }
-                        } catch {
-                            continuation.resume(throwing: EvalAPIError.decodeFailed("JSON解析失败：\(error.localizedDescription)"))
                         }
                     }
                 }

@@ -13,8 +13,8 @@ struct Ai_SayApp: App {
     @StateObject private var loginViewModel = LoginViewModel()
     
     init() {
-        // 设置远程服务器（生产环境）
-        AppConfig.baseURL = "https://14.103.177.132:2580"
+        // 设置服务器地址
+        AppConfig.baseURL = "http://192.168.0.105:2580"
     }
     
     var sharedModelContainer: ModelContainer = {
