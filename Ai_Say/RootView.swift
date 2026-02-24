@@ -30,5 +30,14 @@ struct RootView: View {
             // 收到退出登录通知
             loginViewModel.logout()
         }
+        .onChange(of: loginViewModel.isLoggedIn) { newValue in
+            // 登录状态改变时，异步dismiss键盘以避免状态机冲突
+            if newValue {
+                DispatchQueue.main.async {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                                    to: nil, from: nil, for: nil)
+                }
+            }
+        }
     }
 }

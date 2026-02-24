@@ -86,7 +86,7 @@ struct RecordingView: View {
 
                     // 录音波形（录音中才显示）
                     if vm.recorder.isRecording {
-                        WaveformView(samples: vm.recorder.meter.samples)
+                        WaveformView(samples: vm.recorder.meter.orderedSamples)
                             .transition(.opacity)
                     }
 

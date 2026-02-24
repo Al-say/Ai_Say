@@ -12,9 +12,17 @@ enum AppConfig {
         #endif
     }
 
+    /// 允许手动覆盖baseURL（用于真机调试）
+    static var customBaseURL: String? {
+        get { UserDefaults.standard.string(forKey: "custom_base_url") }
+        set { UserDefaults.standard.set(newValue, forKey: "custom_base_url") }
+    }
+
     /// 统一BaseURL，所有前端请求都使用2580端口
+    /// 可以直接设置以覆盖默认值
     static var baseURL: String {
-        "http://\(host):2580"
+        get { customBaseURL ?? "http://\(host):2580" }
+        set { customBaseURL = newValue }
     }
 
     /// 网络超时（需要时给 Alamofire Session）

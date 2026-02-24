@@ -75,7 +75,7 @@ class LoginViewModel: ObservableObject {
     private func validateTokenAndProceed() async {
         do {
             // 🔥 关键：用一个轻量级的 API 调用来验证 Token
-            let _ = try await EvalAPIClient.shared.fetchDailyChallenge(persona: .examPrep)
+            let _ = try await EvalAPIClient.shared.fetchProfile()
             await MainActor.run {
                 print("✅ Token 验证成功，直接进入主界面")
                 isCheckingAuth = false
@@ -132,6 +132,17 @@ class LoginViewModel: ObservableObject {
                 } else {
                     isLoading = false
                     showError(message: "后端响应中没有accessToken")
+                }
+            }
+            
+            // 绑定设备（在主线程外执行异步操作）
+            if let accessToken = token["accessToken"] as? String {
+                do {
+                    _ = try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
+                    print("✅ 设备绑定成功")
+                } catch {
+                    print("⚠️ 设备绑定失败: \(error.localizedDescription)")
+                    // 设备绑定失败不影响登录成功
                 }
             }
         } catch {
@@ -196,6 +207,16 @@ class LoginViewModel: ObservableObject {
                     isLoading = false
                     loadingMessage = "注册成功"
                     print("✅ 用户注册成功")
+                    
+                    // 绑定设备
+                    Task {
+                        do {
+                            _ = try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
+                            print("✅ 注册设备绑定成功")
+                        } catch {
+                            print("⚠️ 注册设备绑定失败: \(error.localizedDescription)")
+                        }
+                    }
                 } else {
                     // 如果没有返回token，切换到登录模式让用户重新登录
                     isRegisterMode = false
@@ -277,6 +298,16 @@ class LoginViewModel: ObservableObject {
                                 // 不影响登录成功，但记录警告
                                 loadingMessage = "登录成功（认证待验证）"
                             }
+                        }
+                    }
+                    
+                    // 绑定设备
+                    Task {
+                        do {
+                            _ = try await EvalAPIClient.shared.bindDevice(deviceId: DeviceIdManager.shared.deviceId)
+                            print("✅ Apple登录设备绑定成功")
+                        } catch {
+                            print("⚠️ Apple登录设备绑定失败: \(error.localizedDescription)")
                         }
                     }
                 } else {

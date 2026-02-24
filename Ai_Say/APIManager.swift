@@ -30,7 +30,7 @@ final class APIManager: ObservableObject {
         serverMessage = "上传中..."
         evalResult = nil
 
-        AF.upload(
+        EvalAPIClient.afSession.upload(
             multipartFormData: { form in
                 // ✅ 后端字段名：file
                 form.append(fileURL, withName: "file", fileName: "recording.m4a", mimeType: "audio/m4a")
@@ -95,7 +95,7 @@ final class APIManager: ObservableObject {
         serverMessage = "评估中..."
         evalResult = nil
         
-        let response = await AF.request(url, method: .post, parameters: req, encoder: JSONParameterEncoder.default, interceptor: interceptor)
+        let response = await EvalAPIClient.afSession.request(url, method: .post, parameters: req, encoder: JSONParameterEncoder.default, interceptor: interceptor)
             .serializingDecodable(TextEvalResp.self)
             .response
         
@@ -126,7 +126,7 @@ final class APIManager: ObservableObject {
         isLoading = true
         serverMessage = "正在登录..."
 
-        let response = await AF.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
+        let response = await EvalAPIClient.afSession.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
             .serializingData()
             .response
 

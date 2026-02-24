@@ -12,6 +12,11 @@ import SwiftData
 struct Ai_SayApp: App {
     @StateObject private var loginViewModel = LoginViewModel()
     
+    init() {
+        // 设置远程服务器（生产环境）
+        AppConfig.baseURL = "https://14.103.177.132:2580"
+    }
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,

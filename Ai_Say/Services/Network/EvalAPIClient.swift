@@ -19,14 +19,40 @@ enum EvalAPIError: Error, LocalizedError {
 final class EvalAPIClient: Sendable {
     static let shared = EvalAPIClient()
 
-    // ✅ 真机必须用 Mac 局域网 IP
-    let baseURL = AppConfig.baseURL
+    // 动态读取，支持运行时切换服务器
+    var baseURL: String { AppConfig.baseURL }
 
     // ✅ 统一 JSON 解码器：支持 snake_case 转 camelCase
     private static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
+    }()
+
+    // 自定义 Session：支持自签名证书 + 重定向保持 POST 方法
+    static let afSession: Session = {
+        // ✅ 信任自签名证书（仅用于开发调试）
+        let evaluators: [String: ServerTrustEvaluating] = [
+            "14.103.177.132": DisabledTrustEvaluator()
+        ]
+        let trustManager = ServerTrustManager(allHostsMustBeEvaluated: false, evaluators: evaluators)
+
+        // ✅ 自定义重定向处理器：保持原始 HTTP 方法（防止 POST 被改为 GET）
+        let redirectHandler = Redirector(behavior: .modify { task, request, response in
+            var newRequest = request
+            newRequest.httpMethod = task.originalRequest?.httpMethod ?? request.httpMethod
+            newRequest.httpBody = task.originalRequest?.httpBody
+            return newRequest
+        })
+
+        let config = URLSessionConfiguration.af.default
+        config.timeoutIntervalForRequest = AppConfig.requestTimeout
+
+        return Session(
+            configuration: config,
+            serverTrustManager: trustManager,
+            redirectHandler: redirectHandler
+        )
     }()
 
     // MARK: - 认证拦截器
@@ -351,7 +377,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
+            Self.afSession.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -398,7 +424,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
+            Self.afSession.request(url, method: .post, parameters: body, encoding: JSONEncoding.default)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -436,7 +462,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -475,7 +501,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .post, parameters: body, encoding: JSONEncoding.default, interceptor: interceptor)
+            Self.afSession.request(url, method: .post, parameters: body, encoding: JSONEncoding.default, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -516,7 +542,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -558,7 +584,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -606,7 +632,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -647,7 +673,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -690,7 +716,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params)
+            Self.afSession.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -726,7 +752,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -766,7 +792,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, parameters: params, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, parameters: params, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -802,7 +828,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -838,7 +864,7 @@ extension EvalAPIClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
-            AF.request(url, method: .get, interceptor: interceptor)
+            Self.afSession.request(url, method: .get, interceptor: interceptor)
                 .responseData { resp in
                     let duration = Date().timeIntervalSince(startTime)
                     let code = resp.response?.statusCode ?? 0
@@ -872,6 +898,9 @@ private class Authenticator: RequestAdapter {
         // 从 UserDefaults 获取 accessToken
         if let token = UserDefaults.standard.string(forKey: "accessToken"), !token.isEmpty {
             request.headers.add(.authorization(bearerToken: token))
+            print("🔐 Authenticator: Added Authorization header for \(urlRequest.url?.absoluteString ?? "unknown")")
+        } else {
+            print("⚠️ Authenticator: No token found in UserDefaults for \(urlRequest.url?.absoluteString ?? "unknown")")
         }
         completion(.success(request))
     }

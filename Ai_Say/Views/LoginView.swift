@@ -1,5 +1,4 @@
 import SwiftUI
-import AuthenticationServices
 
 struct LoginView: View {
     @EnvironmentObject private var viewModel: LoginViewModel
@@ -91,28 +90,7 @@ struct LoginView: View {
                         }
                         .padding(.horizontal, 40)
                         
-                        // 分隔线
-                        HStack {
-                            Rectangle()
-                                .frame(height: 1)
-                                .foregroundColor(.gray.opacity(0.5))
-                            Text("或")
-                                .foregroundColor(.gray)
-                            Rectangle()
-                                .frame(height: 1)
-                                .foregroundColor(.gray.opacity(0.5))
-                        }
-                        .padding(.horizontal, 40)
-                        
-                        // Apple登录
-                        SignInWithAppleButton(.signIn) { request in
-                            viewModel.handleSignInWithAppleRequest(request)
-                        } onCompletion: { result in
-                            viewModel.handleSignInWithAppleCompletion(result)
-                        }
-                        .signInWithAppleButtonStyle(.whiteOutline)
-                        .frame(height: 50)
-                        .padding(.horizontal, 40)
+
                     }
 
                     Text("继续即表示您同意我们的服务条款")
