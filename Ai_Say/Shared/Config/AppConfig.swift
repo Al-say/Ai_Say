@@ -8,7 +8,7 @@ enum AppConfig {
         return UserDefaults.standard.string(forKey: "api_host") ?? "localhost"
         #else
         // 真机：使用Mac的局域网IP
-        return UserDefaults.standard.string(forKey: "api_host") ?? "192.168.0.106"
+        return UserDefaults.standard.string(forKey: "api_host") ?? "192.168.5.178"
         #endif
     }
 

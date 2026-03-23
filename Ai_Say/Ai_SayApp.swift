@@ -14,7 +14,7 @@ struct Ai_SayApp: App {
     
     init() {
         // 设置服务器地址
-        AppConfig.baseURL = "http://192.168.0.105:2580"
+        AppConfig.baseURL = "http://192.168.5.178:2580"
     }
     
     var sharedModelContainer: ModelContainer = {
