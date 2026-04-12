@@ -13,6 +13,7 @@ final class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDel
 
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
+    private var recordingStartTime: Date?
 
     func requestPermission() async -> Bool {
         if #available(iOS 17.0, *) {
@@ -61,6 +62,7 @@ final class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDel
         isRecording = true
         duration = 0
         lastFileURL = url
+        recordingStartTime = Date()  // ✅ 记录开始时间
 
         // ✅ 绑定并启动采样
         meter.bind(recorder: recorder)
@@ -69,7 +71,8 @@ final class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDel
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.duration += 0.1
+                guard let self, let startTime = self.recordingStartTime else { return }
+                self.duration = Date().timeIntervalSince(startTime)  // ✅ 用实际时间差替代累加
             }
         }
     }

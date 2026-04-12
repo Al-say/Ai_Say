@@ -13,8 +13,8 @@ struct Ai_SayApp: App {
     @StateObject private var loginViewModel = LoginViewModel()
     
     init() {
-        // 设置服务器地址
-        AppConfig.baseURL = "http://192.168.5.178:2580"
+        // 清除旧的缓存 URL，确保使用 AppConfig.host 动态构建
+        UserDefaults.standard.removeObject(forKey: "custom_base_url")
     }
     
     var sharedModelContainer: ModelContainer = {

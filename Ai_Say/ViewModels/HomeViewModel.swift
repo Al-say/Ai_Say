@@ -13,6 +13,9 @@ class HomeViewModel: ObservableObject {
     // 用于控制 Banner 的显示状态
     @Published var showDailyChallengeError: Bool = false
 
+    // 🆕 云端历史记录（用于主页显示真实分数）
+    @Published var recentRecords: [GrowthHistoryItem] = []
+
     // MARK: - Dependencies
     private var cancellables = Set<AnyCancellable>()
 
@@ -21,7 +24,10 @@ class HomeViewModel: ObservableObject {
         // 监听 Persona 变化，一旦角色切换，自动刷新每日挑战
         NotificationCenter.default.publisher(for: .personaDidChange)
             .sink { [weak self] _ in
-                Task { await self?.fetchDailyChallenge() }
+                Task {
+                    await self?.fetchDailyChallenge()
+                    await self?.fetchRecentHistory()
+                }
             }
             .store(in: &cancellables)
     }
@@ -63,6 +69,23 @@ class HomeViewModel: ObservableObject {
                     self.showDailyChallengeError = true
                 }
             }
+        }
+    }
+
+    /// 🆕 从云端加载最近的练习记录（包含真实分数）
+    func fetchRecentHistory() async {
+        do {
+            let history = try await EvalAPIClient.shared.fetchGrowthHistory(
+                persona: PersonaStore.shared.current,
+                limit: 5
+            )
+            withAnimation {
+                self.recentRecords = history
+            }
+            print("✅ [HomeVM] 最近记录加载成功: \(history.count) 条")
+        } catch {
+            print("⚠️ [HomeVM] 最近记录加载失败: \(error.localizedDescription)")
+            // 不影响主页其他部分显示
         }
     }
 

@@ -8,7 +8,7 @@ enum AppConfig {
         return UserDefaults.standard.string(forKey: "api_host") ?? "localhost"
         #else
         // 真机：使用Mac的局域网IP
-        return UserDefaults.standard.string(forKey: "api_host") ?? "192.168.5.178"
+        return UserDefaults.standard.string(forKey: "api_host") ?? "192.168.8.6"
         #endif
     }
 
@@ -19,12 +19,12 @@ enum AppConfig {
     }
 
     /// 统一BaseURL，所有前端请求都使用2580端口
-    /// 可以直接设置以覆盖默认值
+    /// 动态使用 host 属性，避免硬编码 IP
     static var baseURL: String {
         get { customBaseURL ?? "http://\(host):2580" }
         set { customBaseURL = newValue }
     }
 
-    /// 网络超时（需要时给 Alamofire Session）
-    static let requestTimeout: TimeInterval = 30
+    /// 网络超时（AI 评估可能比较久，设为 120 秒）
+    static let requestTimeout: TimeInterval = 120
 }

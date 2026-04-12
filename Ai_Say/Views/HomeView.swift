@@ -62,6 +62,7 @@ struct HomeView: View {
             // 🚀 核心生命周期：页面出现时加载数据
             .task {
                 await vm.fetchDailyChallenge()
+                await vm.fetchRecentHistory()
             }
             // 当 Sheet 关闭时清理路由状态
             .onChange(of: router.sheetRoute) { _, newValue in
@@ -141,16 +142,18 @@ struct HomeView: View {
     // MARK: - Right Column: Info Flow
     private var rightInfoColumn: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // 1. 最近表现 (绑定 SwiftData 实时数据)
-            if let lastItem = items.first {
+            // 1. 最近表现 (使用云端数据显示真实分数)
+            if let latest = vm.recentRecords.first {
+                CloudRecentPerformanceCard(record: latest)
+            } else if let lastItem = items.first {
                 RecentPerformanceCard(item: lastItem)
             } else {
                 EmptyStateCard(text: "完成第一次练习后\n解锁成长报告")
             }
 
-            // 2. 历史记录预览
+            // 2. 历史记录预览 (使用云端数据)
             Text("练习记录").font(.headline)
-            HistoryPreviewList(items: Array(items.prefix(3)), onSeeAll: {
+            CloudHistoryPreviewList(records: Array(vm.recentRecords.prefix(3)), onSeeAll: {
                 router.selectedTab = .growth
             })
             .padding(16)
@@ -179,7 +182,8 @@ struct HomeView: View {
             .clipShape(Capsule())
             .shadow(color: .accentColor.opacity(0.4), radius: 10, y: 5)
         }
-        .padding(32)
+        .padding(.horizontal, 32)
+        .padding(.bottom, 100) // 抬高，避免被底部导航栏遮挡
         .frame(maxHeight: .infinity, alignment: .bottom) // 确保固定在底部
     }
 
@@ -458,5 +462,102 @@ struct EmptyStateCard: View {
                     .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
                     .foregroundStyle(.tertiary)
             )
+    }
+}
+
+// MARK: - 🆕 云端数据 UI 组件
+
+/// 最近表现卡片 - 使用云端 GrowthHistoryItem
+struct CloudRecentPerformanceCard: View {
+    let record: GrowthHistoryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("最近表现").font(.headline)
+
+            HStack(spacing: 15) {
+                ScoreMiniCircle(score: record.overallValue, label: "总分")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("上次练习：\(formatDate(record.createdAt))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(getEncouragement(score: record.overallValue))
+                        .font(.caption.bold())
+                        .foregroundStyle(getScoreColor(score: record.overallValue))
+                }
+            }
+            .padding(16)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+        }
+    }
+
+    private func formatDate(_ isoString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: isoString) {
+            return date.formatted(.dateTime.month().day().hour().minute())
+        }
+        // fallback: 不含小数秒
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: isoString) {
+            return date.formatted(.dateTime.month().day().hour().minute())
+        }
+        return String(isoString.prefix(10))
+    }
+
+    private func getEncouragement(score: Int) -> String {
+        switch score {
+        case 90...100: return "表现完美，大师级水准！"
+        case 80..<90:  return "进步显著，继续保持！"
+        case 60..<80:  return "基础扎实，再接再厉。"
+        default:       return "只要开口，就是进步。"
+        }
+    }
+
+    private func getScoreColor(score: Int) -> Color {
+        score >= 80 ? .green : (score >= 60 ? .orange : .gray)
+    }
+}
+
+/// 历史列表组件 - 使用云端 GrowthHistoryItem
+struct CloudHistoryPreviewList: View {
+    let records: [GrowthHistoryItem]
+    let onSeeAll: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(records.enumerated()), id: \.element.id) { idx, record in
+                HStack {
+                    Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                    Text(record.date)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Text("口语评估")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(record.overallValue)")
+                        .font(.subheadline.bold())
+                        .monospacedDigit()
+                        .foregroundStyle(record.overallValue > 0 ? Color.accentColor : .secondary)
+                }
+                .padding(.vertical, 12)
+
+                if idx != records.count - 1 {
+                    Divider()
+                }
+            }
+
+            if records.isEmpty {
+                Text("暂无记录")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding()
+            } else {
+                Button("查看全部历史", action: onSeeAll)
+                    .font(.caption.bold())
+                    .padding(.top, 14)
+            }
+        }
     }
 }
